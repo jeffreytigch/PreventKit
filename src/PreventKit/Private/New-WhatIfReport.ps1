@@ -46,6 +46,20 @@ function New-WhatIfReport {
             -Format { param($service) "  - $($service.Id) ($($service.Name))" }
         $lines += Format-ReportList -Title 'Blockable addresses' -Items $cAddresses -Indent 2 `
             -Format { param($address) "  - $($address.Value) ($($address.Type))" }
+
+        $cniTable = Get-CniProjectionTable -Snapshot $contribution
+        if (@($cniTable.Projections).Count -gt 0 -or @($cniTable.Unprojectable).Count -gt 0) {
+            $lines += '  CNI projections:'
+            foreach ($projection in @($cniTable.Projections)) {
+                $expansionFlag = if ($projection.Expanded) { ' [expansion]' } else { '' }
+                $lines += "    - $($projection.Value) ($($projection.IndicatorType))$expansionFlag"
+            }
+            foreach ($unprojectable in @($cniTable.Unprojectable)) {
+                $lines += "    - skipped: $($unprojectable.Value) ($($unprojectable.Reason))"
+            }
+            $lines += "  ExpansionCount: $($cniTable.ExpansionCount) | Unprojectable: $(@($cniTable.Unprojectable).Count)"
+        }
+
         $lines += ''
     }
 

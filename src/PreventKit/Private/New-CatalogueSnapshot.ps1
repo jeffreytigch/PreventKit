@@ -49,6 +49,11 @@ function New-CatalogueSnapshot {
         ParsedCounts   = $parsedCounts
     }
 
+    $destinationSettings = @{}
+    if ($Declaration.ContainsKey('Destinations')) {
+        $destinationSettings = $Declaration.Destinations
+    }
+
     [pscustomobject]@{
         CatalogueName       = $Declaration.Name
         Scope               = $Scope
@@ -58,5 +63,6 @@ function New-CatalogueSnapshot {
         BlockableAddresses  = @($Parsed.BlockableAddresses)
         Unrepresentable     = @($Parsed.Unrepresentable)
         Validation          = $Validation
+        DestinationSettings = $destinationSettings
     }
 }
