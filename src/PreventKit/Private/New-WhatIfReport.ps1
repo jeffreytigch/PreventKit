@@ -4,9 +4,9 @@ Render a human-readable WhatIf run report from the desired state.
 
 .DESCRIPTION
 Produces a readable report listing the desired state as services and blockable
-addresses, then a section per catalogue contribution showing what each enabled
-catalogue declaration contributed. Nothing is written to any enforcement
-destination.
+addresses, what invocation exceptions suppressed, and a section per catalogue
+contribution showing what each enabled catalogue declaration contributed.
+Nothing is written to any enforcement destination.
 
 .OUTPUTS
 System.String, one line per report line.
@@ -32,6 +32,22 @@ function New-WhatIfReport {
     $lines += Format-ReportList -Title 'Blockable addresses' -Items $DesiredState.BlockableAddresses `
         -Format { param($address) "  - $($address.Value) ($($address.Type)) <- $($address.ServiceId)" }
 
+    $suppressed = @()
+    $suppressedProperty = $DesiredState.PSObject.Properties['Suppressed']
+    if ($null -ne $suppressedProperty -and $null -ne $suppressedProperty.Value) {
+        $suppressed = @($suppressedProperty.Value)
+    }
+
+    if ($suppressed.Count -gt 0) {
+        $lines += ''
+        $lines += 'Suppressed by invocation exceptions'
+        $lines += '==================================='
+        $lines += Format-ReportList -Title 'Services' -Items @($suppressed | Where-Object { $_.Kind -eq 'Service' }) `
+            -Format { param($item) "  - $($item.Entry.Id) ($($item.Entry.Name))" }
+        $lines += Format-ReportList -Title 'Blockable addresses' -Items @($suppressed | Where-Object { $_.Kind -eq 'BlockableAddress' }) `
+            -Format { param($item) "  - $($item.Entry.Value) ($($item.Entry.Type)) <- $($item.Entry.ServiceId)" }
+    }
+
     $lines += ''
     $lines += 'Catalogue contributions'
     $lines += '======================='
@@ -42,6 +58,9 @@ function New-WhatIfReport {
         $lines += "[$($contribution.CatalogueName)] (scope: $($contribution.Scope))"
         $lines += "  Source: $($contribution.Fingerprint.SourceLocation)"
         $lines += "  Validation: $($contribution.Validation.Status)"
+        if ($contribution.Fingerprint.UsedLastKnownGood) {
+            $lines += "  Last known good fallback: $($contribution.Fingerprint.FailureReason)"
+        }
         $lines += Format-ReportList -Title 'Services' -Items $cServices -Indent 2 `
             -Format { param($service) "  - $($service.Id) ($($service.Name))" }
         $lines += Format-ReportList -Title 'Blockable addresses' -Items $cAddresses -Indent 2 `

@@ -43,10 +43,17 @@ function New-CatalogueSnapshot {
     }
 
     $fingerprint = [pscustomobject]@{
-        SourceLocation = $SourceData.SourceLocation
-        RetrievedAt    = $SourceData.RetrievedAt
-        ContentHash    = $SourceData.ContentHash
-        ParsedCounts   = $parsedCounts
+        SourceLocation    = $SourceData.SourceLocation
+        RetrievedAt       = $SourceData.RetrievedAt
+        ContentHash       = $SourceData.ContentHash
+        ParsedCounts      = $parsedCounts
+        UsedLastKnownGood = $false
+        FailureReason     = if ($Validation.Status -eq 'Failure') {
+            "Catalogue validation failed for source '$($SourceData.SourceLocation)'."
+        }
+        else {
+            $null
+        }
     }
 
     $destinationSettings = @{}
