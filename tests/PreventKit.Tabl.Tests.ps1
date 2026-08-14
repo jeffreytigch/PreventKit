@@ -120,4 +120,34 @@ Describe 'PreventKit TABL block entry read and classification' {
             }
         }
     }
+
+    Context 'Get-ClassificationReport' {
+
+        It 'aggregates already classified entries into counts' {
+            InModuleScope PreventKit {
+                $classified = @(
+                    [pscustomobject]@{ Classification = 'Managed' }
+                    [pscustomobject]@{ Classification = 'Managed' }
+                    [pscustomobject]@{ Classification = 'UnmanagedCollision' }
+                )
+
+                $report = Get-ClassificationReport -ClassifiedEntries $classified
+
+                $report.TotalCount | Should -Be 3
+                $report.ManagedCount | Should -Be 2
+                $report.UnmanagedCollisionCount | Should -Be 1
+                @($report.Entries).Count | Should -Be 3
+            }
+        }
+
+        It 'handles empty input' {
+            InModuleScope PreventKit {
+                $report = Get-ClassificationReport -ClassifiedEntries @()
+
+                $report.TotalCount | Should -Be 0
+                $report.ManagedCount | Should -Be 0
+                $report.UnmanagedCollisionCount | Should -Be 0
+            }
+        }
+    }
 }
