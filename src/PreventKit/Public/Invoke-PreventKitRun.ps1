@@ -10,6 +10,11 @@ source adapter into the canonical Service / Blockable Address model, validate
 the result, and produce a catalogue snapshot carrying a source fingerprint.
 No enforcement destination is read or written.
 
+With -WhatIf the run additionally computes the desired state (the union of all
+enabled catalogue entries) and prints a readable WhatIf run report showing the
+desired state and each catalogue contribution, still without modifying any
+enforcement destination.
+
 .PARAMETER CatalogueDirectory
 Path to the version-controlled directory of catalogue declarations
 (files matching *.catalog.psd1).
@@ -18,14 +23,18 @@ Path to the version-controlled directory of catalogue declarations
 Invoke-PreventKitRun -CatalogueDirectory .\catalogues
 
 .EXAMPLE
+Invoke-PreventKitRun -CatalogueDirectory .\catalogues -WhatIf
+
+.EXAMPLE
 Invoke-PreventKitRun -CatalogueDirectory .\tests\fixtures\clean
 
 .OUTPUTS
 System.Management.Automation.PSCustomObject, one per enabled catalogue
-declaration in the catalogue directory.
+declaration in the catalogue directory. With -WhatIf, System.String report
+lines instead.
 #>
 function Invoke-PreventKitRun {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
@@ -34,6 +43,7 @@ function Invoke-PreventKitRun {
 
     $declarationFiles = @(Get-ChildItem -Path $CatalogueDirectory -Filter '*.catalog.psd1' -File -ErrorAction Stop)
 
+    $snapshots = @()
     foreach ($declarationFile in $declarationFiles) {
         $declaration = Import-PowerShellDataFile -LiteralPath $declarationFile.FullName
 
@@ -68,7 +78,19 @@ function Invoke-PreventKitRun {
 
         $validation = Test-CatalogueValidation -Content $sourceData.Content -Parsed $parsed
 
-        New-CatalogueSnapshot -Scope $scope -Source $source -Declaration $declaration `
+        $snapshot = New-CatalogueSnapshot -Scope $scope -Source $source -Declaration $declaration `
             -SourceData $sourceData -Parsed $parsed -Validation $validation
+
+        if ($WhatIfPreference) {
+            $snapshots += $snapshot
+        }
+        else {
+            $snapshot
+        }
+    }
+
+    if ($WhatIfPreference) {
+        $desiredState = Get-DesiredState -Snapshot $snapshots
+        New-WhatIfReport -DesiredState $desiredState
     }
 }

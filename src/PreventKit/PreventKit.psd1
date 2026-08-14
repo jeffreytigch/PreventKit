@@ -1,6 +1,6 @@
 @{
     RootModule           = 'PreventKit.psm1'
-    ModuleVersion        = '0.1.0'
+    ModuleVersion        = '0.2.0'
     GUID                 = '2174ebab-52f3-4ddc-a486-7945c3f2d62f'
     Author               = 'PreventKit'
     CompanyName          = 'PreventKit'
@@ -14,7 +14,7 @@
     PrivateData          = @{
         PSData = @{
             Tags                       = @('Security', 'Microsoft365', 'Catalogue')
-            ReleaseNotes               = 'Issue 1: Catalogue retrieval and validation (read side of a Run).'
+            ReleaseNotes               = 'Issue 1: Catalogue retrieval and validation (read side of a Run). Issue 2: Desired state and WhatIf report.'
         }
     }
 }
