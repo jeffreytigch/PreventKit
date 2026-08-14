@@ -1,0 +1,8 @@
+URI,RMM_Tool
+*.anydesk.com,AnyDesk
+relay-[a-f0-9]{8}.net.anydesk.com:443,AnyDesk
+upload_data.qq.com,QQ
+agents*-cloud.acronis.com,Acronis
+136.243.104.235,Ammyy Admin
+*.GoToMyPC.com,GoToMyPC
+GetScreen.me,GetScreen
