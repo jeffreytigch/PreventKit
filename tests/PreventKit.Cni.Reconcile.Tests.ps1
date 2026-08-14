@@ -1,0 +1,270 @@
+BeforeAll {
+    $modulePath = Join-Path $PSScriptRoot '..' 'src' 'PreventKit' 'PreventKit.psd1'
+    Import-Module $modulePath -Force
+}
+
+Describe 'PreventKit reconcile diff (CNI)' {
+
+    It 'diffs by IndicatorValue and treats current indicators as desired when present' {
+        InModuleScope PreventKit {
+            $desired = @(
+                [pscustomobject]@{ Value = 'evil.example.com'; IndicatorType = 'DomainName'; ServiceId = 'lolrmm/Tool' },
+                [pscustomobject]@{ Value = '136.243.104.235'; IndicatorType = 'IpAddress'; ServiceId = 'lolrmm/Tool' }
+            )
+            $current = @(
+                [pscustomobject]@{ IndicatorValue = '136.243.104.235'; IndicatorType = 'IpAddress'; Id = '42'; Description = 'PreventKit managed'; Classification = 'Managed' },
+                [pscustomobject]@{ IndicatorValue = 'admin.example.org'; IndicatorType = 'DomainName'; Id = '43'; Description = 'administrator'; Classification = 'UnmanagedCollision' }
+            )
+
+            $diff = Get-ReconcileDiff -DesiredEntries $desired -CurrentEntries $current -CurrentValueProperty 'IndicatorValue'
+
+            @($diff.Adds).Count | Should -Be 1
+            $diff.Adds[0].Value | Should -Be 'evil.example.com'
+            @($diff.Removes).Count | Should -Be 0
+            @($diff.Unchanged).Count | Should -Be 1
+            $diff.UnmanagedCollisionCount | Should -Be 1
+        }
+    }
+
+    It 'marks a stale managed indicator for removal and leaves the unmanaged collision alone' {
+        InModuleScope PreventKit {
+            $desired = @(
+                [pscustomobject]@{ Value = 'evil.example.com'; IndicatorType = 'DomainName'; ServiceId = 'lolrmm/Tool' }
+            )
+            $current = @(
+                [pscustomobject]@{ IndicatorValue = 'stale.example.org'; IndicatorType = 'DomainName'; Id = '9'; Description = 'PreventKit managed'; Classification = 'Managed' },
+                [pscustomobject]@{ IndicatorValue = 'old.example.net'; IndicatorType = 'DomainName'; Id = '8'; Description = 'administrator'; Classification = 'UnmanagedCollision' }
+            )
+
+            $diff = Get-ReconcileDiff -DesiredEntries $desired -CurrentEntries $current -CurrentValueProperty 'IndicatorValue'
+
+            @($diff.Adds).Count | Should -Be 1
+            @($diff.Removes).Count | Should -Be 1
+            $diff.Removes[0].Id | Should -Be '9'
+            $diff.UnmanagedCollisionCount | Should -Be 1
+        }
+    }
+}
+
+Describe 'PreventKit CNI managed entry submission' {
+
+    It 'posts one import batch per BatchSize, carrying provenance in description with no expiry' {
+        InModuleScope PreventKit {
+            $projections = @(
+                [pscustomobject]@{ Value = 'evil.example.com'; IndicatorType = 'DomainName'; ServiceId = 'lolrmm/Tool' },
+                [pscustomobject]@{ Value = '136.243.104.235'; IndicatorType = 'IpAddress'; ServiceId = 'lolrmm/Tool' }
+            )
+
+            $script:captured = @()
+            Mock Invoke-CniApiRequest {
+                param($Uri, $Body)
+                $script:captured += [pscustomobject]@{ Uri = $Uri; Body = $Body }
+                return $null
+            }
+            Mock Start-Sleep { }
+
+            Add-CniManagedEntry -Projections $projections -BatchSize 1 -RateLimitPerMinute 0
+
+            $script:captured.Count | Should -Be 2
+            $first = $script:captured[0].Body.Indicators[0]
+            $first.indicatorValue | Should -Be 'evil.example.com'
+            $first.indicatorType | Should -Be 'DomainName'
+            $first.action | Should -Be 'Block'
+            $first.title | Should -Be 'lolrmm/Tool'
+            $first.description | Should -Match $script:provenanceNamespace
+            $first.PSObject.Properties.Name | Should -Not -Contain 'expirationTime'
+        }
+    }
+
+    It 'paces batches to respect the rate limit' {
+        InModuleScope PreventKit {
+            $projections = @(
+                [pscustomobject]@{ Value = 'a.example.com'; IndicatorType = 'DomainName'; ServiceId = 'lolrmm/Tool' },
+                [pscustomobject]@{ Value = 'b.example.net'; IndicatorType = 'DomainName'; ServiceId = 'lolrmm/Tool' },
+                [pscustomobject]@{ Value = 'c.example.org'; IndicatorType = 'DomainName'; ServiceId = 'lolrmm/Tool' }
+            )
+
+            Mock Invoke-CniApiRequest { return $null }
+            Mock Start-Sleep { }
+
+            Add-CniManagedEntry -Projections $projections -BatchSize 1 -RateLimitPerMinute 60
+
+            Assert-MockCalled Invoke-CniApiRequest -Times 3 -Exactly
+            Assert-MockCalled Start-Sleep -Times 2 -Exactly
+        }
+    }
+
+    It 'does not sleep when the rate limit is disabled' {
+        InModuleScope PreventKit {
+            $projections = @(
+                [pscustomobject]@{ Value = 'a.example.com'; IndicatorType = 'DomainName'; ServiceId = 'lolrmm/Tool' },
+                [pscustomobject]@{ Value = 'b.example.net'; IndicatorType = 'DomainName'; ServiceId = 'lolrmm/Tool' }
+            )
+
+            Mock Invoke-CniApiRequest { return $null }
+            Mock Start-Sleep { }
+
+            Add-CniManagedEntry -Projections $projections -BatchSize 1 -RateLimitPerMinute 0
+
+            Assert-MockCalled Start-Sleep -Times 0 -Exactly
+        }
+    }
+
+    It 'returns no entry when given no projections' {
+        InModuleScope PreventKit {
+            Mock Invoke-CniApiRequest { return $null }
+            Mock Start-Sleep { }
+
+            $result = Add-CniManagedEntry -Projections @() -BatchSize 1 -RateLimitPerMinute 0
+
+            Assert-MockCalled Invoke-CniApiRequest -Times 0 -Exactly
+            $result | Should -BeNullOrEmpty
+        }
+    }
+}
+
+Describe 'PreventKit CNI rate-limited API request' {
+
+    It 'retries with backoff on a 429 and succeeds' {
+        InModuleScope PreventKit {
+            $script:calls = 0
+            Mock Invoke-RestMethod {
+                $script:calls++
+                if ($script:calls -eq 1) {
+                    $resp = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::TooManyRequests)
+                    throw [Microsoft.PowerShell.Commands.HttpResponseException]::new("429", $resp)
+                }
+                return @{ results = @() }
+            }
+            Mock Start-Sleep { }
+
+            $result = Invoke-CniApiRequest -Uri 'https://api.security.microsoft.com/api/indicators/import' -Body @{ Indicators = @() } -MaxRetries 3 -BackoffSeconds 1
+
+            $script:calls | Should -Be 2
+            Assert-MockCalled Start-Sleep -Times 1 -Exactly
+        }
+    }
+
+    It 'gives up after MaxRetries on persistent 429' {
+        InModuleScope PreventKit {
+            Mock Invoke-RestMethod {
+                $resp = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::TooManyRequests)
+                throw [Microsoft.PowerShell.Commands.HttpResponseException]::new("429", $resp)
+            }
+            Mock Start-Sleep { }
+
+            { Invoke-CniApiRequest -Uri 'https://api.security.microsoft.com/api/indicators/import' -Body @{ Indicators = @() } -MaxRetries 2 -BackoffSeconds 0 } | Should -Throw
+
+            Assert-MockCalled Invoke-RestMethod -Times 3 -Exactly
+        }
+    }
+}
+
+Describe 'PreventKit CNI managed entry removal' {
+
+    It 'posts batched indicator ids to the BatchDelete endpoint' {
+        InModuleScope PreventKit {
+            $script:captured = @()
+            Mock Invoke-CniApiRequest {
+                param($Uri, $Body)
+                $script:captured += [pscustomobject]@{ Uri = $Uri; Body = $Body }
+                return $null
+            }
+            Mock Start-Sleep { }
+
+            Remove-CniManagedEntry -Id @('1', '2', '3') -BatchSize 2 -RateLimitPerMinute 0
+
+            $script:captured.Count | Should -Be 2
+            $script:captured[0].Uri | Should -Match 'BatchDelete'
+            @($script:captured[0].Body.IndicatorIds) | Should -Be @('1', '2')
+            @($script:captured[1].Body.IndicatorIds) | Should -Be @('3')
+        }
+    }
+    It 'paces remove batches to respect the rate limit' {
+        InModuleScope PreventKit {
+            Mock Invoke-CniApiRequest { return $null }
+            Mock Start-Sleep { }
+
+            Remove-CniManagedEntry -Id @('1', '2', '3') -BatchSize 1 -RateLimitPerMinute 60
+
+            Assert-MockCalled Invoke-CniApiRequest -Times 3 -Exactly
+            Assert-MockCalled Start-Sleep -Times 2 -Exactly
+        }
+    }
+
+    It 'does not sleep when the remove rate limit is disabled' {
+        InModuleScope PreventKit {
+            Mock Invoke-CniApiRequest { return $null }
+            Mock Start-Sleep { }
+
+            Remove-CniManagedEntry -Id @('1', '2') -BatchSize 1 -RateLimitPerMinute 0
+
+            Assert-MockCalled Start-Sleep -Times 0 -Exactly
+        }
+    }
+}
+
+Describe 'PreventKit CNI reconciliation' {
+
+    It 'adds missing projections and removes stale managed indicators, leaving unmanaged alone' {
+        InModuleScope PreventKit {
+            $desired = @(
+                [pscustomobject]@{ Value = 'evil.example.com'; IndicatorType = 'DomainName'; ServiceId = 'lolrmm/Tool' },
+                [pscustomobject]@{ Value = 'keep.example.net'; IndicatorType = 'DomainName'; ServiceId = 'lolrmm/Tool' }
+            )
+            $current = @(
+                [pscustomobject]@{ indicatorValue = 'keep.example.net'; indicatorType = 'DomainName'; description = 'PreventKit managed'; id = '1'; action = 'Block' },
+                [pscustomobject]@{ indicatorValue = 'stale.example.org'; indicatorType = 'DomainName'; description = 'PreventKit managed'; id = '2'; action = 'Block' },
+                [pscustomobject]@{ indicatorValue = 'admin.example.org'; indicatorType = 'DomainName'; description = 'administrator'; id = '3'; action = 'Block' }
+            )
+
+            Mock Add-CniManagedEntry { return $Projections }
+            Mock Remove-CniManagedEntry { }
+
+            $result = Invoke-CniReconciliation -DesiredEntries $desired -CurrentEntries $current -Capacity 10
+
+            $result.Status | Should -Be 'Reconciled'
+            Assert-MockCalled Add-CniManagedEntry -Times 1 -Exactly -ParameterFilter { @($Projections | Where-Object { $_.Value -eq 'evil.example.com' }).Count -eq 1 }
+            Assert-MockCalled Remove-CniManagedEntry -Times 1 -Exactly -ParameterFilter { @($Id | Where-Object { $_ -eq '2' }).Count -eq 1 }
+            Assert-MockCalled Remove-CniManagedEntry -Times 0 -Exactly -ParameterFilter { @($Id | Where-Object { $_ -eq '3' }).Count -eq 1 }
+        }
+    }
+
+    It 'aborts without any write when capacity preflight fails' {
+        InModuleScope PreventKit {
+            $desired = @(
+                [pscustomobject]@{ Value = 'evil.example.com'; IndicatorType = 'DomainName'; ServiceId = 'lolrmm/Tool' }
+            )
+
+            Mock Add-CniManagedEntry { }
+            Mock Remove-CniManagedEntry { }
+
+            $result = Invoke-CniReconciliation -DesiredEntries $desired -CurrentEntries @() -Capacity 0
+
+            $result.Status | Should -Be 'Aborted'
+            $result.Preflight.Passed | Should -BeFalse
+            Assert-MockCalled Add-CniManagedEntry -Times 0 -Exactly
+            Assert-MockCalled Remove-CniManagedEntry -Times 0 -Exactly
+        }
+    }
+
+    It 'a second run against the reconciled destination makes no changes' {
+        InModuleScope PreventKit {
+            $desired = @(
+                [pscustomobject]@{ Value = 'evil.example.com'; IndicatorType = 'DomainName'; ServiceId = 'lolrmm/Tool' }
+            )
+            $afterFirstRun = @(
+                [pscustomobject]@{ indicatorValue = 'evil.example.com'; indicatorType = 'DomainName'; description = 'PreventKit managed entry'; id = '1'; action = 'Block' }
+            )
+
+            Mock Add-CniManagedEntry { }
+            Mock Remove-CniManagedEntry { }
+
+            $result = Invoke-CniReconciliation -DesiredEntries $desired -CurrentEntries $afterFirstRun -Capacity 10
+
+            $result.Status | Should -Be 'NoChanges'
+            Assert-MockCalled Add-CniManagedEntry -Times 0 -Exactly
+            Assert-MockCalled Remove-CniManagedEntry -Times 0 -Exactly
+        }
+    }
+}
