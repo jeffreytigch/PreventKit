@@ -3,6 +3,24 @@ BeforeAll {
     Import-Module $modulePath -Force
 }
 
+Describe 'PreventKit provenance namespace configuration' {
+
+    It 'freezes the provenance namespace from module config at load' {
+        InModuleScope PreventKit -Parameters @{ modulePath = $modulePath } {
+            $manifest = Import-PowerShellDataFile -LiteralPath $modulePath
+            $script:provenanceNamespace | Should -Be $manifest.PrivateData.ProvenanceNamespace
+        }
+    }
+
+    It 'classifies entries carrying the configured namespace as managed' {
+        InModuleScope PreventKit {
+            $entry = [pscustomobject]@{ Value = 'evil.example.com'; Notes = "$($script:provenanceNamespace) managed entry" }
+
+            (Get-EntryClassification -Entry $entry -Field 'Notes') | Should -Be 'Managed'
+        }
+    }
+}
+
 Describe 'PreventKit TABL block entry read and classification' {
 
     Context 'Read-TablBlockEntry' {

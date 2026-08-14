@@ -31,5 +31,5 @@ function Test-EntryProvenance {
         return $false
     }
 
-    return $value.IndexOf((Get-ProvenanceNamespace), [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+    return $value.IndexOf($script:provenanceNamespace, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
 }
