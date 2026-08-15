@@ -4,9 +4,9 @@ Render a human-readable WhatIf run report from the desired state.
 
 .DESCRIPTION
 Produces a readable report listing the desired state as services and blockable
-addresses, what invocation exceptions suppressed, and a section per catalogue
-contribution showing what each enabled catalogue declaration contributed.
-Nothing is written to any enforcement destination.
+addresses, what invocation exceptions and global exceptions suppressed, and a
+section per catalogue contribution showing what each enabled catalogue
+declaration contributed. Nothing is written to any enforcement destination.
 
 .OUTPUTS
 System.String, one line per report line.
@@ -39,13 +39,27 @@ function New-WhatIfReport {
     }
 
     if ($suppressed.Count -gt 0) {
-        $lines += ''
-        $lines += 'Suppressed by invocation exceptions'
-        $lines += '==================================='
-        $lines += Format-ReportList -Title 'Services' -Items @($suppressed | Where-Object { $_.Kind -eq 'Service' }) `
-            -Format { param($item) "  - $($item.Entry.Id) ($($item.Entry.Name))" }
-        $lines += Format-ReportList -Title 'Blockable addresses' -Items @($suppressed | Where-Object { $_.Kind -eq 'BlockableAddress' }) `
-            -Format { param($item) "  - $($item.Entry.Value) ($($item.Entry.Type)) <- $($item.Entry.ServiceId)" }
+        $invocationSuppressed = @($suppressed | Where-Object { $_.ExceptionType -eq 'Invocation' })
+        if ($invocationSuppressed.Count -gt 0) {
+            $lines += ''
+            $lines += 'Suppressed by invocation exceptions'
+            $lines += '==================================='
+            $lines += Format-ReportList -Title 'Services' -Items @($invocationSuppressed | Where-Object { $_.Kind -eq 'Service' }) `
+                -Format { param($item) "  - $($item.Entry.Id) ($($item.Entry.Name))" }
+            $lines += Format-ReportList -Title 'Blockable addresses' -Items @($invocationSuppressed | Where-Object { $_.Kind -eq 'BlockableAddress' }) `
+                -Format { param($item) "  - $($item.Entry.Value) ($($item.Entry.Type)) <- $($item.Entry.ServiceId)" }
+        }
+
+        $globalSuppressed = @($suppressed | Where-Object { $_.ExceptionType -eq 'Global' })
+        if ($globalSuppressed.Count -gt 0) {
+            $lines += ''
+            $lines += 'Suppressed by global exceptions'
+            $lines += '==============================='
+            $lines += Format-ReportList -Title 'Services' -Items @($globalSuppressed | Where-Object { $_.Kind -eq 'Service' }) `
+                -Format { param($item) "  - $($item.Entry.Id) ($($item.Entry.Name))" }
+            $lines += Format-ReportList -Title 'Blockable addresses' -Items @($globalSuppressed | Where-Object { $_.Kind -eq 'BlockableAddress' }) `
+                -Format { param($item) "  - $($item.Entry.Value) ($($item.Entry.Type)) <- $($item.Entry.ServiceId)" }
+        }
     }
 
     $lines += ''

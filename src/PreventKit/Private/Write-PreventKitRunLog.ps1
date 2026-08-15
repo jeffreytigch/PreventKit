@@ -5,9 +5,11 @@ Write a durable run log entry for one Run.
 .DESCRIPTION
 Persists one JSON file per Run under the log directory, capturing the run id
 and timing, the catalogue directory, the exception keys applied, the source
-fingerprints of every catalogue snapshot, and the reconciliation outcomes per
-enforcement destination. The entry is emitted as an object; callers that do not
-want it on the pipeline can assign it to $null.
+fingerprints of every catalogue snapshot, the reconciliation outcomes per
+enforcement destination, and the Run status. Runs that complete normally are
+recorded with status 'Completed'; a failing scheduled Run is recorded with
+status 'Failed' and its error message. The entry is emitted as an object;
+callers that do not want it on the pipeline can assign it to $null.
 
 .OUTPUTS
 System.Management.Automation.PSCustomObject, the written log entry.
@@ -34,11 +36,22 @@ function Write-PreventKitRunLog {
 
         [Parameter()]
         [AllowEmptyCollection()]
+        [string[]]$GlobalExceptionKey = @(),
+
+        [Parameter()]
+        [AllowEmptyCollection()]
         [object[]]$Snapshots = @(),
 
         [Parameter()]
         [AllowEmptyCollection()]
-        [object[]]$DestinationOutcomes = @()
+        [object[]]$DestinationOutcomes = @(),
+
+        [Parameter()]
+        [ValidateSet('Completed', 'Failed')]
+        [string]$Status = 'Completed',
+
+        [Parameter()]
+        [string]$ErrorMessage
     )
 
     $fingerprints = @($Snapshots | ForEach-Object {
@@ -60,8 +73,11 @@ function Write-PreventKitRunLog {
         CompletedAt        = [datetime]::UtcNow
         CatalogueDirectory = $CatalogueDirectory
         Exceptions         = @($ExceptionKey)
+        GlobalExceptions   = @($GlobalExceptionKey)
         SourceFingerprints = @($fingerprints)
         DestinationOutcomes = @($DestinationOutcomes)
+        Status             = $Status
+        ErrorMessage       = if ([string]::IsNullOrWhiteSpace($ErrorMessage)) { $null } else { $ErrorMessage }
     }
 
     if (-not (Test-Path -LiteralPath $LogDirectory -PathType Container)) {

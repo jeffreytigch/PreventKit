@@ -1,19 +1,20 @@
 <#
 .SYNOPSIS
-Test whether a service or blockable address is suppressed by an invocation
-exception key.
+Test whether a service or blockable address is suppressed by an exception key.
 
 .DESCRIPTION
-An invocation exception is a non-overriding exception supplied through a Run's
-parameters. Keys are exact, namespaced identifiers: 'service:<serviceId>'
+An exception key is an exact, namespaced identifier used by invocation
+exceptions (supplied through a Run's parameters) and global exceptions
+(stored declarations). Keys are of the form 'service:<serviceId>', which
 matches a Service with that Id (and therefore every blockable address of that
-service) and 'domain:<value>' matches a blockable address with that Value.
-Matching is case-insensitive; a missing or empty candidate never matches.
+service), or 'domain:<value>', which matches a blockable address with that
+Value. Matching is case-insensitive; a missing or empty candidate never
+matches.
 
 .OUTPUTS
 System.Boolean, $true when the candidate is suppressed.
 #>
-function Test-InvocationException {
+function Test-ExceptionKey {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]

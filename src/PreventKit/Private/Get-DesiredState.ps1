@@ -9,11 +9,15 @@ blockable addresses by address Value. A snapshot that failed validation
 contributes no entries but is still carried as a contribution so a report can
 show why. Each snapshot is its own catalogue contribution record.
 
-Invocation exceptions are non-overriding: an entry that matches an exception
-key drops out of the desired state entirely (services by 'service:<Id>' keys,
-blockable addresses by 'domain:<Value>' keys or the service key of their
-service) and is recorded in the Suppressed collection so a report can show what
-was suppressed. No allow rule is ever created; suppression only removes.
+Non-overriding exceptions drop matching entries out of the desired state
+entirely (services by 'service:<Id>' keys, blockable addresses by
+'domain:<Value>' keys or the service key of their service) and record them in
+the Suppressed collection so a report can show what was suppressed. Invocation
+exceptions are supplied per Run through ExceptionKey; global exceptions are
+stored declarations supplied through GlobalExceptionKey and applied to every
+Run. Each suppressed entry carries the Source it was suppressed by
+('Invocation' or 'Global'). No allow rule is ever created; suppression only
+removes.
 
 .OUTPUTS
 System.Management.Automation.PSCustomObject with Services, BlockableAddresses,
@@ -28,7 +32,11 @@ function Get-DesiredState {
 
         [Parameter()]
         [AllowEmptyCollection()]
-        [string[]]$ExceptionKey = @()
+        [string[]]$ExceptionKey = @(),
+
+        [Parameter()]
+        [AllowEmptyCollection()]
+        [string[]]$GlobalExceptionKey = @()
     )
 
     $services = @{}
@@ -40,11 +48,19 @@ function Get-DesiredState {
     foreach ($snapshot in @($Snapshot)) {
         if ($snapshot.Validation.Status -eq 'Success') {
             foreach ($service in @($snapshot.Services)) {
-                if (Test-InvocationException -ExceptionKey $ExceptionKey -ServiceId ([string]$service.Id)) {
+                $suppressedType = $null
+                if (Test-ExceptionKey -ExceptionKey $ExceptionKey -ServiceId ([string]$service.Id)) {
+                    $suppressedType = 'Invocation'
+                }
+                elseif (Test-ExceptionKey -ExceptionKey $GlobalExceptionKey -ServiceId ([string]$service.Id)) {
+                    $suppressedType = 'Global'
+                }
+
+                if ($null -ne $suppressedType) {
                     $key = "Service:$($service.Id)"
                     if (-not $suppressedSeen.ContainsKey($key)) {
                         $suppressedSeen[$key] = $true
-                        $suppressed += [pscustomobject]@{ Kind = 'Service'; Entry = $service }
+                        $suppressed += [pscustomobject]@{ Kind = 'Service'; Entry = $service; ExceptionType = $suppressedType }
                     }
                     continue
                 }
@@ -55,12 +71,21 @@ function Get-DesiredState {
             }
 
             foreach ($address in @($snapshot.BlockableAddresses)) {
-                if (Test-InvocationException -ExceptionKey $ExceptionKey `
+                $suppressedType = $null
+                if (Test-ExceptionKey -ExceptionKey $ExceptionKey `
                         -ServiceId ([string]$address.ServiceId) -AddressValue ([string]$address.Value)) {
+                    $suppressedType = 'Invocation'
+                }
+                elseif (Test-ExceptionKey -ExceptionKey $GlobalExceptionKey `
+                        -ServiceId ([string]$address.ServiceId) -AddressValue ([string]$address.Value)) {
+                    $suppressedType = 'Global'
+                }
+
+                if ($null -ne $suppressedType) {
                     $key = "BlockableAddress:$($address.Value)"
                     if (-not $suppressedSeen.ContainsKey($key)) {
                         $suppressedSeen[$key] = $true
-                        $suppressed += [pscustomobject]@{ Kind = 'BlockableAddress'; Entry = $address }
+                        $suppressed += [pscustomobject]@{ Kind = 'BlockableAddress'; Entry = $address; ExceptionType = $suppressedType }
                     }
                     continue
                 }

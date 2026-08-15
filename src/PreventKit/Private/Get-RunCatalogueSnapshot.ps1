@@ -55,6 +55,7 @@ function Get-RunCatalogueSnapshot {
 
     $parsed = switch ($adapterName) {
         'LolRmmCsv' { ConvertFrom-LolRmmCsv -Content $sourceData.Content -Scope $scope }
+        'AwesomeTunneling' { ConvertFrom-AwesomeTunneling -Content $sourceData.Content -Scope $scope }
         default {
             $errorRecord = [System.Management.Automation.ErrorRecord]::new(
                 [System.Exception]::new("Unknown source adapter '$adapterName' for catalogue '$($Declaration.Name)'."),

@@ -33,6 +33,11 @@ Path to the version-controlled directory of catalogue declarations
 Invocation exception keys (e.g. 'service:lolrmm/AnyDesk', 'domain:anydesk.com').
 Non-overriding: matched entries leave the desired state and are not enforced.
 
+.PARAMETER ExceptionDirectory
+Path to the version-controlled directory of global exception declarations
+(files matching *.exception.psd1). Every enabled declaration contributes its
+exception keys to every Run.
+
 .PARAMETER StateDirectory
 Directory where last known good catalogue snapshots are persisted.
 
@@ -79,6 +84,9 @@ function Invoke-PreventKitRun {
         [string[]]$ExceptionKey = @(),
 
         [Parameter()]
+        [string]$ExceptionDirectory,
+
+        [Parameter()]
         [string]$StateDirectory,
 
         [Parameter()]
@@ -110,6 +118,11 @@ function Invoke-PreventKitRun {
         }
     }
 
+    $globalExceptionKey = @()
+    if (-not [string]::IsNullOrWhiteSpace($ExceptionDirectory)) {
+        $globalExceptionKey = @(Get-GlobalExceptionKey -ExceptionDirectory $ExceptionDirectory)
+    }
+
     $declarationFiles = @(Get-ChildItem -Path $CatalogueDirectory -Filter '*.catalog.psd1' -File -ErrorAction Stop)
 
     $snapshots = @()
@@ -125,7 +138,7 @@ function Invoke-PreventKitRun {
             -Declaration $declaration -StateDirectory $StateDirectory
     }
 
-    $desiredState = Get-DesiredState -Snapshot $snapshots -ExceptionKey $ExceptionKey
+    $desiredState = Get-DesiredState -Snapshot $snapshots -ExceptionKey $ExceptionKey -GlobalExceptionKey $globalExceptionKey
 
     if ($WhatIfPreference) {
         New-WhatIfReport -DesiredState $desiredState
@@ -136,6 +149,7 @@ function Invoke-PreventKitRun {
             try {
                 $null = Write-PreventKitRunLog -LogDirectory $LogDirectory -RunId $runId -StartedAt $startedAt `
                     -CatalogueDirectory $CatalogueDirectory -ExceptionKey $ExceptionKey `
+                    -GlobalExceptionKey $globalExceptionKey `
                     -Snapshots $snapshots -DestinationOutcomes @()
             }
             finally {
@@ -161,6 +175,7 @@ function Invoke-PreventKitRun {
     if (-not [string]::IsNullOrWhiteSpace($LogDirectory)) {
         $null = Write-PreventKitRunLog -LogDirectory $LogDirectory -RunId $runId -StartedAt $startedAt `
             -CatalogueDirectory $CatalogueDirectory -ExceptionKey $ExceptionKey `
+            -GlobalExceptionKey $globalExceptionKey `
             -Snapshots $snapshots -DestinationOutcomes $destinationOutcomes
     }
 
