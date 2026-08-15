@@ -125,7 +125,9 @@ Describe 'PreventKit TABL reconciliation' {
 
             $result.Status | Should -Be 'Reconciled'
             Assert-MockCalled Add-TablManagedEntry -Times 1 -Exactly -ParameterFilter { $Values -contains 'new.example.com' }
-            Assert-MockCalled Remove-TablManagedEntry -Times 1 -Exactly -ParameterFilter { $Identities -contains '2' }
+            Assert-MockCalled Remove-TablManagedEntry -Times 1 -Exactly -ParameterFilter {
+                @($Identities).Count -eq 1 -and @($Identities) -contains '2' -and @($Identities) -notcontains '3'
+            }
             Assert-MockCalled Remove-TablManagedEntry -Times 0 -Exactly -ParameterFilter { $Identities -contains '3' }
         }
     }
@@ -183,6 +185,39 @@ Describe 'PreventKit TABL reconciliation' {
             $result.Status | Should -Be 'NoChanges'
             Assert-MockCalled Add-TablManagedEntry -Times 0 -Exactly
             Assert-MockCalled Remove-TablManagedEntry -Times 0 -Exactly
+        }
+    }
+}
+
+Describe 'PreventKit TABL managed entry removal' {
+
+    It 'calls the destination cmdlet with its supported parameter set, never with -Block' {
+        InModuleScope PreventKit {
+            function Remove-TenantAllowBlockListItems {
+                [CmdletBinding()]
+                param(
+                    [Parameter(Mandatory)][string]$ListType,
+                    [Parameter(Mandatory)][string[]]$Ids,
+                    [string[]]$Entries,
+                    [string]$ListSubType
+                )
+            }
+
+            $script:captured = @()
+            Mock Remove-TenantAllowBlockListItems {
+                $script:captured += [pscustomobject]@{
+                    ListType = $ListType
+                    Ids      = @($Ids)
+                    Block    = $PSBoundParameters.ContainsKey('Block')
+                }
+            }
+
+            Remove-TablManagedEntry -Identities @('1', '2')
+
+            $script:captured.Count | Should -Be 1
+            $script:captured[0].ListType | Should -Be 'Url'
+            @($script:captured[0].Ids) | Should -Be @('1', '2')
+            $script:captured[0].Block | Should -BeFalse
         }
     }
 }

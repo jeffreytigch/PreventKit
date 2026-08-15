@@ -87,6 +87,26 @@ Describe 'PreventKit scheduled Run wrapper' {
         }
     }
 
+    It 'a scheduled Run failing during reconciliation records one Failed entry with partial outcomes' {
+        $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
+        InModuleScope PreventKit -Parameters @{ logDir = $logDir; cleanDir = $cleanDir } {
+            Mock Add-TablManagedEntry { return $Values }
+            Mock Remove-TablManagedEntry { }
+            Mock Invoke-CniReconciliation { throw 'CNI API unavailable' }
+
+            $exitCode = Start-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir `
+                -TablCapacity 10 -CniCapacity 10 -CniToken 'test-token'
+
+            $exitCode | Should -Be 1
+            $entries = @(Get-PreventKitRunLog -LogDirectory $logDir)
+            $entries.Count | Should -Be 1
+            $entries[0].Status | Should -Be 'Failed'
+            $entries[0].ErrorMessage | Should -Match 'CNI API unavailable'
+            @($entries[0].DestinationOutcomes).Count | Should -Be 1
+            $entries[0].DestinationOutcomes[0].Destination | Should -Be 'Tabl'
+        }
+    }
+
     It 'forwards destination capacities to the Run engine' {
         InModuleScope PreventKit -Parameters @{ cleanDir = $cleanDir } {
             $script:received = $null

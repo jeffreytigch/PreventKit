@@ -121,75 +121,96 @@ function Invoke-PreventKitRun {
     $startedAt = [datetime]::UtcNow
     $runId = [guid]::NewGuid()
 
-    foreach ($key in @($ExceptionKey)) {
-        if (-not [string]::IsNullOrWhiteSpace($key) -and $key -notlike 'service:*' -and $key -notlike 'domain:*') {
-            Write-Warning "Ignoring exception key '$key': expected 'service:<serviceId>' or 'domain:<value>'."
-        }
-    }
+    $script:preventKitRunLogEntryWritten = $false
 
-    $globalExceptionKey = @()
-    if (-not [string]::IsNullOrWhiteSpace($ExceptionDirectory)) {
-        $globalExceptionKey = @(Get-GlobalExceptionKey -ExceptionDirectory $ExceptionDirectory)
-    }
+    $globalExceptionKey   = @()
+    $snapshots            = @()
+    $destinationOutcomes  = @()
 
-    $declarationFiles = @(Get-ChildItem -Path $CatalogueDirectory -Filter '*.catalog.psd1' -File -ErrorAction Stop)
-
-    $snapshots = @()
-    foreach ($declarationFile in $declarationFiles) {
-        $declaration = Import-PowerShellDataFile -LiteralPath $declarationFile.FullName
-
-        if (-not $declaration.Enabled) {
-            Write-Verbose "Skipping disabled catalogue declaration: $($declaration.Name)"
-            continue
+    try {
+        foreach ($key in @($ExceptionKey)) {
+            if (-not [string]::IsNullOrWhiteSpace($key) -and $key -notlike 'service:*' -and $key -notlike 'domain:*') {
+                Write-Warning "Ignoring exception key '$key': expected 'service:<serviceId>' or 'domain:<value>'."
+            }
         }
 
-        $snapshots += Get-RunCatalogueSnapshot -DeclarationFile $declarationFile.FullName `
-            -Declaration $declaration -StateDirectory $StateDirectory
-    }
+        if (-not [string]::IsNullOrWhiteSpace($ExceptionDirectory)) {
+            $globalExceptionKey = @(Get-GlobalExceptionKey -ExceptionDirectory $ExceptionDirectory)
+        }
 
-    $desiredState = Get-DesiredState -Snapshot $snapshots -ExceptionKey $ExceptionKey -GlobalExceptionKey $globalExceptionKey
+        $declarationFiles = @(Get-ChildItem -Path $CatalogueDirectory -Filter '*.catalog.psd1' -File -ErrorAction Stop)
 
-    if ($WhatIfPreference) {
-        New-WhatIfReport -DesiredState $desiredState
+        foreach ($declarationFile in $declarationFiles) {
+            $declaration = Import-PowerShellDataFile -LiteralPath $declarationFile.FullName
+
+            if (-not $declaration.Enabled) {
+                Write-Verbose "Skipping disabled catalogue declaration: $($declaration.Name)"
+                continue
+            }
+
+            $snapshots += Get-RunCatalogueSnapshot -DeclarationFile $declarationFile.FullName `
+                -Declaration $declaration -StateDirectory $StateDirectory
+        }
+
+        $desiredState = Get-DesiredState -Snapshot $snapshots -ExceptionKey $ExceptionKey -GlobalExceptionKey $globalExceptionKey
+
+        if ($WhatIfPreference) {
+            New-WhatIfReport -DesiredState $desiredState
+
+            if (-not [string]::IsNullOrWhiteSpace($LogDirectory)) {
+                $previousWhatIfPreference = $WhatIfPreference
+                $WhatIfPreference = $false
+                try {
+                    $null = Write-PreventKitRunLog -LogDirectory $LogDirectory -RunId $runId -StartedAt $startedAt `
+                        -CatalogueDirectory $CatalogueDirectory -ExceptionKey $ExceptionKey `
+                        -GlobalExceptionKey $globalExceptionKey `
+                        -Snapshots $snapshots -DestinationOutcomes @()
+                }
+                finally {
+                    $WhatIfPreference = $previousWhatIfPreference
+                }
+            }
+            return
+        }
+
+        if ($TablCapacity -ge 0) {
+            $destinationOutcomes += Invoke-TablReconciliation -DesiredEntries @($desiredState.BlockableAddresses) `
+                -CurrentEntries $TablCurrentEntries -Capacity $TablCapacity
+        }
+
+        if ($CniCapacity -ge 0) {
+            if ([string]::IsNullOrWhiteSpace($CniToken)) {
+                throw 'A CNI Run requires a token: supply -CniToken with an MDE Custom Network Indicators API access token.'
+            }
+            $cniProjections = Get-CniDesiredProjections -DesiredState $desiredState
+            $destinationOutcomes += Invoke-CniReconciliation -DesiredEntries $cniProjections `
+                -CurrentEntries $CniCurrentEntries -Capacity $CniCapacity -Token $CniToken
+        }
 
         if (-not [string]::IsNullOrWhiteSpace($LogDirectory)) {
-            $previousWhatIfPreference = $WhatIfPreference
-            $WhatIfPreference = $false
+            $null = Write-PreventKitRunLog -LogDirectory $LogDirectory -RunId $runId -StartedAt $startedAt `
+                -CatalogueDirectory $CatalogueDirectory -ExceptionKey $ExceptionKey `
+                -GlobalExceptionKey $globalExceptionKey `
+                -Snapshots $snapshots -DestinationOutcomes $destinationOutcomes
+            $script:preventKitRunLogEntryWritten = $true
+        }
+
+        $snapshots
+    }
+    catch {
+        if (-not [string]::IsNullOrWhiteSpace($LogDirectory)) {
             try {
                 $null = Write-PreventKitRunLog -LogDirectory $LogDirectory -RunId $runId -StartedAt $startedAt `
                     -CatalogueDirectory $CatalogueDirectory -ExceptionKey $ExceptionKey `
                     -GlobalExceptionKey $globalExceptionKey `
-                    -Snapshots $snapshots -DestinationOutcomes @()
+                    -Snapshots $snapshots -DestinationOutcomes $destinationOutcomes `
+                    -Status 'Failed' -ErrorMessage $_.Exception.Message
+                $script:preventKitRunLogEntryWritten = $true
             }
-            finally {
-                $WhatIfPreference = $previousWhatIfPreference
+            catch {
+                Write-Warning "Could not write the failed Run log entry: $($_.Exception.Message)"
             }
         }
-        return
+        throw
     }
-
-    $destinationOutcomes = @()
-
-    if ($TablCapacity -ge 0) {
-        $destinationOutcomes += Invoke-TablReconciliation -DesiredEntries @($desiredState.BlockableAddresses) `
-            -CurrentEntries $TablCurrentEntries -Capacity $TablCapacity
-    }
-
-    if ($CniCapacity -ge 0) {
-        if ([string]::IsNullOrWhiteSpace($CniToken)) {
-            throw 'A CNI Run requires a token: supply -CniToken with an MDE Custom Network Indicators API access token.'
-        }
-        $cniProjections = Get-CniDesiredProjections -DesiredState $desiredState
-        $destinationOutcomes += Invoke-CniReconciliation -DesiredEntries $cniProjections `
-            -CurrentEntries $CniCurrentEntries -Capacity $CniCapacity -Token $CniToken
-    }
-
-    if (-not [string]::IsNullOrWhiteSpace($LogDirectory)) {
-        $null = Write-PreventKitRunLog -LogDirectory $LogDirectory -RunId $runId -StartedAt $startedAt `
-            -CatalogueDirectory $CatalogueDirectory -ExceptionKey $ExceptionKey `
-            -GlobalExceptionKey $globalExceptionKey `
-            -Snapshots $snapshots -DestinationOutcomes $destinationOutcomes
-    }
-
-    $snapshots
 }

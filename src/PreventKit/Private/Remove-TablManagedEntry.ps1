@@ -18,5 +18,5 @@ function Remove-TablManagedEntry {
         [string[]]$Identities
     )
 
-    Remove-TenantAllowBlockListItems -ListType Url -Block -Ids $Identities
+    Remove-TenantAllowBlockListItems -ListType Url -Ids $Identities
 }

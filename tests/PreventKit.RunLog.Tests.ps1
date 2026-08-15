@@ -88,4 +88,24 @@ Describe 'PreventKit run log' {
             @($entries[0].DestinationOutcomes).Count | Should -Be 0
         }
     }
+
+    It 'a Run that fails during reconciliation writes a Failed entry with the error and partial outcomes' {
+        $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
+        InModuleScope PreventKit -Parameters @{ logDir = $logDir; cleanDir = $cleanDir } {
+            Mock Add-TablManagedEntry { return $Values }
+            Mock Remove-TablManagedEntry { }
+            Mock Invoke-CniReconciliation { throw 'CNI API unavailable' }
+
+            { Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir `
+                -TablCapacity 10 -CniCapacity 10 -CniToken 'test-token' } | Should -Throw
+
+            $entries = @(Get-PreventKitRunLog -LogDirectory $logDir)
+
+            $entries.Count | Should -Be 1
+            $entries[0].Status | Should -Be 'Failed'
+            $entries[0].ErrorMessage | Should -Match 'CNI API unavailable'
+            @($entries[0].DestinationOutcomes).Count | Should -Be 1
+            $entries[0].DestinationOutcomes[0].Destination | Should -Be 'Tabl'
+        }
+    }
 }

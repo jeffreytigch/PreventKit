@@ -106,6 +106,8 @@ function Start-PreventKitRun {
         return 1
     }
 
+    $script:preventKitRunLogEntryWritten = $false
+
     try {
         $null = Invoke-PreventKitRun -CatalogueDirectory $CatalogueDirectory `
             -ExceptionKey $ExceptionKey -ExceptionDirectory $ExceptionDirectory `
@@ -118,7 +120,7 @@ function Start-PreventKitRun {
         return 0
     }
     catch {
-        if (-not [string]::IsNullOrWhiteSpace($LogDirectory)) {
+        if (-not $script:preventKitRunLogEntryWritten -and -not [string]::IsNullOrWhiteSpace($LogDirectory)) {
             try {
                 $null = Write-PreventKitRunLog -LogDirectory $LogDirectory `
                     -CatalogueDirectory $CatalogueDirectory `
