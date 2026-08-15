@@ -1,0 +1,6 @@
+.agents
+.github
+.DS_Store
+
+state/
+logs/
