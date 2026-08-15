@@ -4,12 +4,13 @@ Run PreventKit for a scheduled invocation, returning a process exit code.
 
 .DESCRIPTION
 Wraps Invoke-PreventKitRun for unattended, scheduled execution. It invokes the
-same Run engine as a manual Run and forwards every Run parameter. A successful
-Run returns exit code 0 with the engine's own run log entry (status Completed).
-A failing Run writes a run log entry with status Failed and the error message,
-then returns exit code 1 so a scheduler can observe the failure without a human
-present. When no LogDirectory is supplied, a failing Run still returns a
-non-zero exit code.
+same Run engine as a manual Run and forwards every Run parameter. A Run that
+completes without throwing returns exit code 0 with the engine's own run log
+entry: status Completed, or status Partial when a destination aborted (for
+example a capacity preflight failure). A failing Run writes a run log entry
+with status Failed and the error message, then returns exit code 1 so a
+scheduler can observe the failure without a human present. When no LogDirectory
+is supplied, a failing Run still returns a non-zero exit code.
 
 .PARAMETER CatalogueDirectory
 Path to the version-controlled directory of catalogue declarations

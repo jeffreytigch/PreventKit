@@ -7,9 +7,11 @@ Persists one JSON file per Run under the log directory, capturing the run id
 and timing, the catalogue directory, the exception keys applied, the source
 fingerprints of every catalogue snapshot, the reconciliation outcomes per
 enforcement destination, and the Run status. Runs that complete normally are
-recorded with status 'Completed'; a failing scheduled Run is recorded with
-status 'Failed' and its error message. The entry is emitted as an object;
-callers that do not want it on the pipeline can assign it to $null.
+recorded with status 'Completed'; when a destination aborts (for example a
+capacity preflight failure) the Run status reflects that partial completion as
+'Partial' unless the caller supplies an explicit status; a failing Run is
+recorded with status 'Failed' and its error message. The entry is emitted as an
+object; callers that do not want it on the pipeline can assign it to $null.
 
 .OUTPUTS
 System.Management.Automation.PSCustomObject, the written log entry.
@@ -47,12 +49,19 @@ function Write-PreventKitRunLog {
         [object[]]$DestinationOutcomes = @(),
 
         [Parameter()]
-        [ValidateSet('Completed', 'Failed')]
+        [ValidateSet('Completed', 'Partial', 'Failed')]
         [string]$Status = 'Completed',
 
         [Parameter()]
         [string]$ErrorMessage
     )
+
+    $effectiveStatus = $Status
+    if (-not $PSBoundParameters.ContainsKey('Status')) {
+        if (@($DestinationOutcomes | Where-Object { $_.Status -eq 'Aborted' }).Count -gt 0) {
+            $effectiveStatus = 'Partial'
+        }
+    }
 
     $fingerprints = @($Snapshots | ForEach-Object {
         [pscustomobject]@{
@@ -76,7 +85,7 @@ function Write-PreventKitRunLog {
         GlobalExceptions   = @($GlobalExceptionKey)
         SourceFingerprints = @($fingerprints)
         DestinationOutcomes = @($DestinationOutcomes)
-        Status             = $Status
+        Status             = $effectiveStatus
         ErrorMessage       = if ([string]::IsNullOrWhiteSpace($ErrorMessage)) { $null } else { $ErrorMessage }
     }
 

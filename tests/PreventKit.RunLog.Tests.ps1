@@ -64,6 +64,20 @@ Describe 'PreventKit run log' {
         }
     }
 
+    It 'a per-run report surfaces the run status so a Partial run is visible' {
+        $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
+        InModuleScope PreventKit -Parameters @{ logDir = $logDir; cleanDir = $cleanDir } {
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 0
+
+            $entry = @(Get-PreventKitRunLog -LogDirectory $logDir)[0]
+            $report = @(New-PreventKitRunReport -LogEntry $entry)
+            $text = $report -join "`n"
+
+            $text | Should -Match 'Status: Partial'
+            $text | Should -Match 'Tabl: Aborted'
+        }
+    }
+
     It 'queries a single run by its run id' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         InModuleScope PreventKit -Parameters @{ logDir = $logDir } {
@@ -107,5 +121,51 @@ Describe 'PreventKit run log' {
             @($entries[0].DestinationOutcomes).Count | Should -Be 1
             $entries[0].DestinationOutcomes[0].Destination | Should -Be 'Tabl'
         }
+    }
+
+    It 'a Run whose destination aborts on capacity preflight is logged as Partial with the Aborted outcome' {
+        $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
+        InModuleScope PreventKit -Parameters @{ logDir = $logDir; cleanDir = $cleanDir } {
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 0
+
+            $entries = @(Get-PreventKitRunLog -LogDirectory $logDir)
+
+            $entries.Count | Should -Be 1
+            $entries[0].Status | Should -Be 'Partial'
+            @($entries[0].DestinationOutcomes).Count | Should -Be 1
+            $entries[0].DestinationOutcomes[0].Destination | Should -Be 'Tabl'
+            $entries[0].DestinationOutcomes[0].Status | Should -Be 'Aborted'
+        }
+    }
+}
+
+Describe 'PreventKit exported run-log helpers' {
+
+    It 'Get-PreventKitRunLog is callable from an imported module instance' {
+        $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
+        $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir
+
+        $entries = @(Get-PreventKitRunLog -LogDirectory $logDir)
+
+        $entries.Count | Should -Be 1
+        $entries[0].Status | Should -Be 'Completed'
+    }
+
+    It 'New-PreventKitRunReport is callable from an imported module instance and renders a report' {
+        $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
+        $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir
+
+        $entry = @(Get-PreventKitRunLog -LogDirectory $logDir)[0]
+        $report = @(New-PreventKitRunReport -LogEntry $entry)
+
+        $text = $report -join "`n"
+        $text | Should -Match 'PreventKit run'
+        $text | Should -Match 'lolrmm'
+    }
+
+    It 'the public module manifest exports both helpers' {
+        $module = Get-Module PreventKit
+        $module.ExportedFunctions.Keys | Should -Contain 'Get-PreventKitRunLog'
+        $module.ExportedFunctions.Keys | Should -Contain 'New-PreventKitRunReport'
     }
 }

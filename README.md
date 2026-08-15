@@ -73,11 +73,11 @@ See the script's comment-based help for Windows Task Scheduler registration.
 
 ## Run log
 
-Each Run writes a durable entry to the log directory (`<run-id>.run.json`) capturing source fingerprints, exceptions applied, per-destination reconciliation outcomes, and the Run status. Query entries with `Get-PreventKitRunLog` and print a per-run report with `New-PreventKitRunReport`.
+Each Run writes a durable entry to the log directory (`<run-id>.run.json`) capturing source fingerprints, exceptions applied, per-destination reconciliation outcomes, and the Run status. Query entries with `Get-PreventKitRunLog` and print a per-run report with `New-PreventKitRunReport`. A Run that throws during reconciliation is logged as `Failed` with its error message and any captured per-destination outcomes; a Run whose destination aborts (for example a capacity preflight failure) is logged as `Partial` while still recording the `Aborted` destination outcome.
 
 ## Module layout
 
-- `src/PreventKit/Public/` — the exported commands (`Invoke-PreventKitRun`, `Start-PreventKitRun`).
+- `src/PreventKit/Public/` — the exported commands (`Invoke-PreventKitRun`, `Start-PreventKitRun`, `Get-PreventKitRunLog`, `New-PreventKitRunReport`).
 - `src/PreventKit/Private/` — the retrieval, parsing, validation, exception, projection, reconciliation, and run-log internals.
 - `catalogues/` — the version-controlled catalogue declarations.
 - `scheduled/` — the scheduled Run entry point.

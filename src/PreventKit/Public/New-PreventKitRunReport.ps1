@@ -3,10 +3,17 @@
 Render a human-readable per-run report from a run log entry.
 
 .DESCRIPTION
-Produces a readable report for one Run: the run id and timing, the catalogue
-directory, each source fingerprint (catalogue, source, hash, validation status,
-and any last-known-good fallback), the exceptions applied, and the outcome of
-each destination reconciliation.
+Produces a readable report for one Run: the run id, status and timing, the
+catalogue directory, each source fingerprint (catalogue, source, hash,
+validation status, and any last-known-good fallback), the exceptions applied,
+and the outcome of each destination reconciliation.
+
+.PARAMETER LogEntry
+One run log entry as returned by Get-PreventKitRunLog.
+
+.EXAMPLE
+$entry = Get-PreventKitRunLog -LogDirectory .\logs | Select-Object -First 1
+New-PreventKitRunReport -LogEntry $entry
 
 .OUTPUTS
 System.String, one line per report line.
@@ -22,9 +29,13 @@ function New-PreventKitRunReport {
 
     $lines += "PreventKit run $($LogEntry.RunId)"
     $lines += '==================='
+    $lines += "Status: $($LogEntry.Status)"
     $lines += "Catalogue directory: $($LogEntry.CatalogueDirectory)"
     $lines += "Started: $($LogEntry.StartedAt)"
     $lines += "Completed: $($LogEntry.CompletedAt)"
+    if (-not [string]::IsNullOrWhiteSpace($LogEntry.ErrorMessage)) {
+        $lines += "Error: $($LogEntry.ErrorMessage)"
+    }
     $lines += ''
 
     $lines += 'Source fingerprints'

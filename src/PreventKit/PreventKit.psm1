@@ -12,4 +12,4 @@ $publicFunctions  = Get-ChildItem -Path (Join-Path $PSScriptRoot 'Public')  -Fil
 foreach ($file in $privateFunctions) { . $file.FullName }
 foreach ($file in $publicFunctions)  { . $file.FullName }
 
-Export-ModuleMember -Function 'Invoke-PreventKitRun', 'Start-PreventKitRun'
+Export-ModuleMember -Function 'Invoke-PreventKitRun', 'Start-PreventKitRun', 'Get-PreventKitRunLog', 'New-PreventKitRunReport'

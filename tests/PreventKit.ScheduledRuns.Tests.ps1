@@ -107,6 +107,21 @@ Describe 'PreventKit scheduled Run wrapper' {
         }
     }
 
+    It 'a scheduled Run with an aborted destination is logged as Partial and exits zero' {
+        $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
+        InModuleScope PreventKit -Parameters @{ logDir = $logDir; cleanDir = $cleanDir } {
+            $exitCode = Start-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 0
+
+            $exitCode | Should -Be 0
+            $entries = @(Get-PreventKitRunLog -LogDirectory $logDir)
+            $entries.Count | Should -Be 1
+            $entries[0].Status | Should -Be 'Partial'
+            @($entries[0].DestinationOutcomes).Count | Should -Be 1
+            $entries[0].DestinationOutcomes[0].Destination | Should -Be 'Tabl'
+            $entries[0].DestinationOutcomes[0].Status | Should -Be 'Aborted'
+        }
+    }
+
     It 'forwards destination capacities to the Run engine' {
         InModuleScope PreventKit -Parameters @{ cleanDir = $cleanDir } {
             $script:received = $null
@@ -162,6 +177,48 @@ Describe 'PreventKit scheduled Run log entry' {
             $entry = Get-PreventKitRunLog -LogDirectory $logDir -RunId $written.RunId
             $entry.Status | Should -Be 'Completed'
             $entry.ErrorMessage | Should -BeNullOrEmpty
+        }
+    }
+
+    It 'derives a Partial run status when a destination outcome is Aborted' {
+        $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
+        InModuleScope PreventKit -Parameters @{ logDir = $logDir } {
+            $abortedOutcome = [pscustomobject]@{
+                Destination             = 'Tabl'
+                Status                  = 'Aborted'
+                Preflight               = [pscustomobject]@{ Passed = $false; PlannedCount = 4; Capacity = 1 }
+                AddCount                = 4
+                RemoveCount             = 0
+                UnchangedCount          = 0
+                UnmanagedCollisionCount = 0
+            }
+
+            $written = Write-PreventKitRunLog -LogDirectory $logDir -Snapshots @() -DestinationOutcomes @($abortedOutcome)
+
+            $written.Status | Should -Be 'Partial'
+            $entry = Get-PreventKitRunLog -LogDirectory $logDir -RunId $written.RunId
+            $entry.Status | Should -Be 'Partial'
+        }
+    }
+
+    It 'an explicitly Failed status overrides the outcome-derived run status' {
+        $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
+        InModuleScope PreventKit -Parameters @{ logDir = $logDir } {
+            $abortedOutcome = [pscustomobject]@{
+                Destination             = 'Cni'
+                Status                  = 'Aborted'
+                Preflight               = [pscustomobject]@{ Passed = $false; PlannedCount = 9; Capacity = 1 }
+                AddCount                = 9
+                RemoveCount             = 0
+                UnchangedCount          = 0
+                UnmanagedCollisionCount = 0
+            }
+
+            $written = Write-PreventKitRunLog -LogDirectory $logDir -Snapshots @() `
+                -DestinationOutcomes @($abortedOutcome) -Status 'Failed' -ErrorMessage 'Boom'
+
+            $written.Status | Should -Be 'Failed'
+            $written.ErrorMessage | Should -Be 'Boom'
         }
     }
 }
