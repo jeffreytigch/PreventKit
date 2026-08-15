@@ -34,6 +34,12 @@ When supplied, reconcile the Tenant Allow/Block List to the desired state.
 .PARAMETER CniCapacity
 When supplied, reconcile Custom Network Indicators to the desired state.
 
+.PARAMETER CniToken
+The access token for the MDE Custom Network Indicators API, supplied by the
+caller. Required when CniCapacity is supplied so reconciliation never sends an
+unauthenticated request. Any acquisition method works (interactive, client
+certificate, or managed identity).
+
 .PARAMETER TablCurrentEntries
 Raw current TABL URL block entries (as returned by the read side).
 
@@ -78,6 +84,9 @@ function Start-PreventKitRun {
         [int]$CniCapacity = -1,
 
         [Parameter()]
+        [string]$CniToken,
+
+        [Parameter()]
         [AllowEmptyCollection()]
         [object[]]$TablCurrentEntries = @(),
 
@@ -102,6 +111,7 @@ function Start-PreventKitRun {
             -ExceptionKey $ExceptionKey -ExceptionDirectory $ExceptionDirectory `
             -StateDirectory $StateDirectory -LogDirectory $LogDirectory `
             -TablCapacity $TablCapacity -CniCapacity $CniCapacity `
+            -CniToken $CniToken `
             -TablCurrentEntries $TablCurrentEntries -CniCurrentEntries $CniCurrentEntries `
             -ErrorAction Stop
 

@@ -165,7 +165,7 @@ Describe 'PreventKit invocation exceptions are non-overriding in reconciliation'
             Mock Remove-CniManagedEntry { }
 
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -CniCapacity 10 -CniCurrentEntries $currentCni `
-                -ExceptionKey @('service:lolrmm/AnyDesk')
+                -ExceptionKey @('service:lolrmm/AnyDesk') -CniToken 'test-token'
 
             Assert-MockCalled Add-CniManagedEntry -Times 0 -Exactly -ParameterFilter {
                 @($Projections | Where-Object { $_.Value -match 'anydesk' }).Count -gt 0

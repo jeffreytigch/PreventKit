@@ -49,17 +49,17 @@ function ConvertFrom-AwesomeTunneling {
             continue
         }
 
-        $host = $null
+        $hostName = $null
         if ($url -match '^https?://') {
             try {
-                $host = ([System.Uri]$url).Host
+                $hostName = ([System.Uri]$url).Host
             }
             catch {
-                $host = $null
+                $hostName = $null
             }
         }
 
-        if (-not $host) {
+        if (-not $hostName) {
             $unrepresentable += [pscustomobject]@{
                 Value  = $url
                 Reason = 'Not a valid URL with a host'
@@ -68,22 +68,22 @@ function ConvertFrom-AwesomeTunneling {
             continue
         }
 
-        if ($host -match $codeHostPattern) {
+        if ($hostName -match $codeHostPattern) {
             $unrepresentable += [pscustomobject]@{
-                Value  = $host
+                Value  = $hostName
                 Reason = 'Code repository host is not a tunneling endpoint'
             }
-            Write-Warning "Skipping blockable address for code repository host: '$host'"
+            Write-Warning "Skipping blockable address for code repository host: '$hostName'"
             continue
         }
 
-        $type = Get-BlockableAddressType -Value $host
+        $type = Get-BlockableAddressType -Value $hostName
         if (-not $type) {
             $unrepresentable += [pscustomobject]@{
-                Value  = $host
+                Value  = $hostName
                 Reason = 'Not a representable URL, domain, or IP address'
             }
-            Write-Warning "Skipping unrepresentable blockable address: '$host'"
+            Write-Warning "Skipping unrepresentable blockable address: '$hostName'"
             continue
         }
 
@@ -97,7 +97,7 @@ function ConvertFrom-AwesomeTunneling {
         }
 
         $blockableAddresses += [pscustomobject]@{
-            Value     = $host
+            Value     = $hostName
             Type      = $type
             ServiceId = $serviceId
         }

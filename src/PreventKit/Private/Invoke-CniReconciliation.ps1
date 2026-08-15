@@ -21,6 +21,12 @@ indicatorValue, indicatorType, description, id and action.
 .PARAMETER Capacity
 Maximum managed indicators the tenant can hold.
 
+.PARAMETER Token
+The access token to authenticate add and remove requests. Acquired by the
+caller; any acquisition method works. Reconciliation never sends an
+unauthenticated request: the token is required, and the add/remove seams and
+the request function all validate it.
+
 .PARAMETER BatchSize
 Maximum number of indicators or ids per API call.
 
@@ -51,6 +57,10 @@ function Invoke-CniReconciliation {
         [Parameter(Mandatory)]
         [ValidateRange(0, [int]::MaxValue)]
         [int]$Capacity,
+
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Token,
 
         [Parameter()]
         [ValidateRange(1, [int]::MaxValue)]
@@ -91,13 +101,13 @@ function Invoke-CniReconciliation {
     if ($diff.AddCount -gt 0) {
         $null = Add-CniManagedEntry -Projections $diff.Adds -BatchSize $BatchSize `
             -RateLimitPerMinute $RateLimitPerMinute -MaxRetries $MaxRetries `
-            -BackoffSeconds $BackoffSeconds
+            -BackoffSeconds $BackoffSeconds -Token $Token
     }
 
     if ($diff.RemoveCount -gt 0) {
         $null = Remove-CniManagedEntry -Id @($diff.Removes | ForEach-Object { $_.Id }) `
             -BatchSize $BatchSize -RateLimitPerMinute $RateLimitPerMinute `
-            -MaxRetries $MaxRetries -BackoffSeconds $BackoffSeconds
+            -MaxRetries $MaxRetries -BackoffSeconds $BackoffSeconds -Token $Token
     }
 
     New-ReconcileResult -Destination 'Cni' -Status 'Reconciled' -Preflight $preflight `

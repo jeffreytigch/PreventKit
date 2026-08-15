@@ -52,6 +52,12 @@ using TablCurrentEntries as the current entries.
 When supplied, reconcile Custom Network Indicators to the desired state using
 CniCurrentEntries as the current entries.
 
+.PARAMETER CniToken
+The access token for the MDE Custom Network Indicators API, supplied by the
+caller. Required when CniCapacity is supplied so reconciliation never sends an
+unauthenticated request. Any acquisition method works (interactive, client
+certificate, or managed identity).
+
 .PARAMETER TablCurrentEntries
 Raw current TABL URL block entries (as returned by the read side).
 
@@ -99,6 +105,9 @@ function Invoke-PreventKitRun {
         [Parameter()]
         [ValidateRange(-1, [int]::MaxValue)]
         [int]$CniCapacity = -1,
+
+        [Parameter()]
+        [string]$CniToken,
 
         [Parameter()]
         [AllowEmptyCollection()]
@@ -167,9 +176,12 @@ function Invoke-PreventKitRun {
     }
 
     if ($CniCapacity -ge 0) {
+        if ([string]::IsNullOrWhiteSpace($CniToken)) {
+            throw 'A CNI Run requires a token: supply -CniToken with an MDE Custom Network Indicators API access token.'
+        }
         $cniProjections = Get-CniDesiredProjections -DesiredState $desiredState
         $destinationOutcomes += Invoke-CniReconciliation -DesiredEntries $cniProjections `
-            -CurrentEntries $CniCurrentEntries -Capacity $CniCapacity
+            -CurrentEntries $CniCurrentEntries -Capacity $CniCapacity -Token $CniToken
     }
 
     if (-not [string]::IsNullOrWhiteSpace($LogDirectory)) {

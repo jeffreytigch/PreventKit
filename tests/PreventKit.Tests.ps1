@@ -203,3 +203,81 @@ Describe 'PreventKit desired state and WhatIf report' {
         $exported | Where-Object { $_ -match 'Tabl|Indicator|GetTenant|New-Tenant|Invoke-RestMethod|CustomNetwork' } | Should -BeNullOrEmpty
     }
 }
+
+Describe 'PreventKit CNI Run authentication' {
+
+    It 'a CNI Run without a token fails before any request is made' {
+        InModuleScope PreventKit -Parameters @{ cleanDir = $cleanDir } {
+            $script:fixtureDir = $cleanDir
+            Mock Invoke-CniReconciliation { }
+
+            $errorMessage = $null
+            try {
+                Invoke-PreventKitRun -CatalogueDirectory $script:fixtureDir -CniCapacity 10 -CniCurrentEntries @() -ErrorAction Stop
+            }
+            catch {
+                $errorMessage = $_.Exception.Message
+            }
+
+            $errorMessage | Should -Match 'token'
+            Assert-MockCalled Invoke-CniReconciliation -Times 0 -Exactly
+        }
+    }
+
+    It 'forwards the supplied token to CNI reconciliation' {
+        InModuleScope PreventKit -Parameters @{ cleanDir = $cleanDir } {
+            $script:receivedToken = $null
+            Mock Invoke-CniReconciliation {
+                $script:receivedToken = $Token
+                return @()
+            }
+
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -CniCapacity 10 `
+                -CniCurrentEntries @() -CniToken 'test-token'
+
+            $script:receivedToken | Should -Be 'test-token'
+            Assert-MockCalled Invoke-CniReconciliation -Times 1 -Exactly
+        }
+    }
+
+    It 'a Run without CNI reconciliation does not require a token' {
+        InModuleScope PreventKit -Parameters @{ cleanDir = $cleanDir } {
+            $snapshots = @(Invoke-PreventKitRun -CatalogueDirectory $cleanDir -WhatIf)
+            $snapshots | Should -Not -BeNullOrEmpty
+        }
+    }
+}
+
+Describe 'PreventKit authentication documentation' {
+
+    It 'documents Microsoft Entra app registration for the MDE Custom Network Indicators API' {
+        $docPath = Join-Path $PSScriptRoot '..' 'docs' 'authentication.md'
+        $docPath | Should -Exist
+
+        $text = Get-Content -Raw $docPath
+        $text | Should -Match 'App registrations'
+        $text | Should -Match 'WindowsDefenderATP'
+        $text | Should -Match 'admin consent'
+        $text | Should -Match 'api.securitycenter.microsoft.com'
+    }
+
+    It 'documents the interactive, client certificate, and managed identity flows' {
+        $docPath = Join-Path $PSScriptRoot '..' 'docs' 'authentication.md'
+        $text = Get-Content -Raw $docPath
+
+        $text | Should -Match 'Interactive'
+        $text | Should -Match 'Ti.ReadWrite'
+        $text | Should -Match 'client certificate'
+        $text | Should -Match 'openssl'
+        $text | Should -Match 'managed identity'
+    }
+
+    It 'records which flow fits scheduled vs manual Runs and that the token is caller-supplied' {
+        $docPath = Join-Path $PSScriptRoot '..' 'docs' 'authentication.md'
+        $text = Get-Content -Raw $docPath
+
+        $text | Should -Match 'scheduled'
+        $text | Should -Match 'manual'
+        $text | Should -Match 'supplied by the caller'
+    }
+}

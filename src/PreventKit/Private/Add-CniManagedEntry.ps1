@@ -13,6 +13,10 @@ through Invoke-CniApiRequest so 429 responses back off and retry.
 .PARAMETER Projections
 Projected CNI entries. Each must expose Value, IndicatorType and ServiceId.
 
+.PARAMETER Token
+The access token to authenticate the import requests. Acquired by the caller;
+any acquisition method works.
+
 .PARAMETER BatchSize
 Maximum number of indicators per import call.
 
@@ -34,6 +38,10 @@ function Add-CniManagedEntry {
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
         [object[]]$Projections,
+
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Token,
 
         [Parameter()]
         [ValidateRange(1, [int]::MaxValue)]
@@ -81,7 +89,7 @@ function Add-CniManagedEntry {
         })
 
         $body = @{ Indicators = @($indicators) }
-        $responses += Invoke-CniApiRequest -Uri $uri -Body $body `
+        $responses += Invoke-CniApiRequest -Uri $uri -Body $body -Token $Token `
             -MaxRetries $MaxRetries -BackoffSeconds $BackoffSeconds
 
         if ($batchIndex -lt $batches.Count -and $delaySeconds -gt 0) {

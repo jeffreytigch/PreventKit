@@ -49,9 +49,27 @@ Invoke-PreventKitRun -CatalogueDirectory ./catalogues -ExceptionDirectory ./exce
   -TablCapacity 5000 -CniCapacity 15000
 ```
 
+A **CNI Run authenticates** with a caller-supplied token. Acquire it first (see
+[Authentication](docs/authentication.md)) and pass it as `-CniToken`; a Run that
+reconciles Custom Network Indicators without a token fails before any request:
+
+```powershell
+$token = (az account get-access-token --resource 'https://api.securitycenter.microsoft.com' | ConvertFrom-Json).accessToken
+Invoke-PreventKitRun -CatalogueDirectory ./catalogues -CniCapacity 15000 -CniToken $token
+```
+
 ## Scheduled runs
 
-`scheduled/Start-PreventKitScheduledRun.ps1` runs a Run unattended and returns a process exit code a scheduler can observe (0 on success, 1 on failure). Outcomes land in the run log, including a `Failed` entry with the error message for failing Runs. See the script's comment-based help for Windows Task Scheduler registration.
+`scheduled/Start-PreventKitScheduledRun.ps1` runs a Run unattended and returns a process exit code a scheduler can observe (0 on success, 1 on failure). Outcomes land in the run log, including a `Failed` entry with the error message for failing Runs. A scheduled CNI Run supplies its token the same way a manual one does — pass it as `-CniToken` when invoking the wrapper:
+
+```powershell
+$token = (az account get-access-token --resource 'https://api.securitycenter.microsoft.com' | ConvertFrom-Json).accessToken
+& pwsh -NoProfile -File ./scheduled/Start-PreventKitScheduledRun.ps1 `
+  -CatalogueDirectory ./catalogues -StateDirectory ./state -LogDirectory ./logs `
+  -CniCapacity 15000 -CniToken $token
+```
+
+See the script's comment-based help for Windows Task Scheduler registration.
 
 ## Run log
 
@@ -63,6 +81,7 @@ Each Run writes a durable entry to the log directory (`<run-id>.run.json`) captu
 - `src/PreventKit/Private/` — the retrieval, parsing, validation, exception, projection, reconciliation, and run-log internals.
 - `catalogues/` — the version-controlled catalogue declarations.
 - `scheduled/` — the scheduled Run entry point.
+- `docs/authentication.md` — Microsoft Entra app registration and CNI token acquisition (interactive, client certificate, managed identity).
 - `tests/` — Pester tests and fixtures.
 
 ## Development

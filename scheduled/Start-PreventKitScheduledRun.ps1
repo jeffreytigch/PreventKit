@@ -51,7 +51,10 @@ param(
 
     [Parameter()]
     [ValidateRange(-1, [int]::MaxValue)]
-    [int]$CniCapacity = -1
+    [int]$CniCapacity = -1,
+
+    [Parameter()]
+    [string]$CniToken
 )
 
 $modulePath = Join-Path $PSScriptRoot '..' 'src' 'PreventKit' 'PreventKit.psd1'
@@ -70,6 +73,10 @@ $runParameters = @{
     LogDirectory       = $LogDirectory
     TablCapacity       = $TablCapacity
     CniCapacity        = $CniCapacity
+}
+
+if (-not [string]::IsNullOrWhiteSpace($CniToken)) {
+    $runParameters.CniToken = $CniToken
 }
 
 if (-not [string]::IsNullOrWhiteSpace($ExceptionDirectory)) {

@@ -12,6 +12,10 @@ to pass only ids of managed indicators, never unmanaged collisions.
 .PARAMETER Id
 The ids of the managed indicators to remove.
 
+.PARAMETER Token
+The access token to authenticate the BatchDelete requests. Acquired by the
+caller; any acquisition method works.
+
 .PARAMETER BatchSize
 Maximum number of ids per BatchDelete call.
 
@@ -33,6 +37,10 @@ function Remove-CniManagedEntry {
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
         [string[]]$Id,
+
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Token,
 
         [Parameter()]
         [ValidateRange(1, [int]::MaxValue)]
@@ -70,7 +78,7 @@ function Remove-CniManagedEntry {
     foreach ($batch in $batches) {
         $batchIndex++
         $body = @{ IndicatorIds = @($batch) }
-        $responses += Invoke-CniApiRequest -Uri $uri -Body $body `
+        $responses += Invoke-CniApiRequest -Uri $uri -Body $body -Token $Token `
             -MaxRetries $MaxRetries -BackoffSeconds $BackoffSeconds
 
         if ($batchIndex -lt $batches.Count -and $delaySeconds -gt 0) {

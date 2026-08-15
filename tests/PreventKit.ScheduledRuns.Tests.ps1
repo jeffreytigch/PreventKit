@@ -104,6 +104,20 @@ Describe 'PreventKit scheduled Run wrapper' {
             $script:received.CniCapacity | Should -Be 7
         }
     }
+
+    It 'forwards the CNI token to the Run engine' {
+        InModuleScope PreventKit -Parameters @{ cleanDir = $cleanDir } {
+            $script:receivedToken = $null
+            Mock Invoke-PreventKitRun {
+                $script:receivedToken = $CniToken
+                return $null
+            }
+
+            $null = Start-PreventKitRun -CatalogueDirectory $cleanDir -CniCapacity 7 -CniToken 'test-token'
+
+            $script:receivedToken | Should -Be 'test-token'
+        }
+    }
 }
 
 Describe 'PreventKit scheduled Run log entry' {

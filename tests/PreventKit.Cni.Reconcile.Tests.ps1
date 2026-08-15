@@ -57,13 +57,13 @@ Describe 'PreventKit CNI managed entry submission' {
 
             $script:captured = @()
             Mock Invoke-CniApiRequest {
-                param($Uri, $Body)
-                $script:captured += [pscustomobject]@{ Uri = $Uri; Body = $Body }
+                param($Uri, $Body, $Token)
+                $script:captured += [pscustomobject]@{ Uri = $Uri; Body = $Body; Token = $Token }
                 return $null
             }
             Mock Start-Sleep { }
 
-            Add-CniManagedEntry -Projections $projections -BatchSize 1 -RateLimitPerMinute 0
+            Add-CniManagedEntry -Projections $projections -BatchSize 1 -RateLimitPerMinute 0 -Token 'test-token'
 
             $script:captured.Count | Should -Be 2
             $first = $script:captured[0].Body.Indicators[0]
@@ -73,6 +73,8 @@ Describe 'PreventKit CNI managed entry submission' {
             $first.title | Should -Be 'lolrmm/Tool'
             $first.description | Should -Match $script:provenanceNamespace
             $first.PSObject.Properties.Name | Should -Not -Contain 'expirationTime'
+            $script:captured[0].Token | Should -Be 'test-token'
+            $script:captured[1].Token | Should -Be 'test-token'
         }
     }
 
@@ -87,7 +89,7 @@ Describe 'PreventKit CNI managed entry submission' {
             Mock Invoke-CniApiRequest { return $null }
             Mock Start-Sleep { }
 
-            Add-CniManagedEntry -Projections $projections -BatchSize 1 -RateLimitPerMinute 60
+            Add-CniManagedEntry -Projections $projections -BatchSize 1 -RateLimitPerMinute 60 -Token 'test-token'
 
             Assert-MockCalled Invoke-CniApiRequest -Times 3 -Exactly
             Assert-MockCalled Start-Sleep -Times 2 -Exactly
@@ -104,7 +106,7 @@ Describe 'PreventKit CNI managed entry submission' {
             Mock Invoke-CniApiRequest { return $null }
             Mock Start-Sleep { }
 
-            Add-CniManagedEntry -Projections $projections -BatchSize 1 -RateLimitPerMinute 0
+            Add-CniManagedEntry -Projections $projections -BatchSize 1 -RateLimitPerMinute 0 -Token 'test-token'
 
             Assert-MockCalled Start-Sleep -Times 0 -Exactly
         }
@@ -115,7 +117,7 @@ Describe 'PreventKit CNI managed entry submission' {
             Mock Invoke-CniApiRequest { return $null }
             Mock Start-Sleep { }
 
-            $result = Add-CniManagedEntry -Projections @() -BatchSize 1 -RateLimitPerMinute 0
+            $result = Add-CniManagedEntry -Projections @() -BatchSize 1 -RateLimitPerMinute 0 -Token 'test-token'
 
             Assert-MockCalled Invoke-CniApiRequest -Times 0 -Exactly
             $result | Should -BeNullOrEmpty
@@ -124,6 +126,38 @@ Describe 'PreventKit CNI managed entry submission' {
 }
 
 Describe 'PreventKit CNI rate-limited API request' {
+
+    It 'sends the caller-supplied token as an Authorization Bearer header' {
+        InModuleScope PreventKit {
+            $script:capturedHeaders = $null
+            Mock Invoke-RestMethod {
+                $script:capturedHeaders = $Headers
+                return @{ results = @() }
+            }
+
+            $null = Invoke-CniApiRequest -Uri 'https://api.security.microsoft.com/api/indicators/import' `
+                -Body @{ Indicators = @() } -Token 'test-token'
+
+            $script:capturedHeaders['Authorization'] | Should -Be 'Bearer test-token'
+        }
+    }
+
+    It 'keeps the Authorization Bearer header across 429 retries' {
+        InModuleScope PreventKit {
+            $script:headers = @()
+            Mock Invoke-RestMethod {
+                $script:headers += $Headers['Authorization']
+                $resp = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::TooManyRequests)
+                throw [Microsoft.PowerShell.Commands.HttpResponseException]::new("429", $resp)
+            }
+            Mock Start-Sleep { }
+
+            { Invoke-CniApiRequest -Uri 'https://api.security.microsoft.com/api/indicators/import' `
+                -Body @{ Indicators = @() } -Token 'test-token' -MaxRetries 2 -BackoffSeconds 0 } | Should -Throw
+
+            @($script:headers) | Should -Be @('Bearer test-token', 'Bearer test-token', 'Bearer test-token')
+        }
+    }
 
     It 'retries with backoff on a 429 and succeeds' {
         InModuleScope PreventKit {
@@ -138,7 +172,7 @@ Describe 'PreventKit CNI rate-limited API request' {
             }
             Mock Start-Sleep { }
 
-            $result = Invoke-CniApiRequest -Uri 'https://api.security.microsoft.com/api/indicators/import' -Body @{ Indicators = @() } -MaxRetries 3 -BackoffSeconds 1
+            $result = Invoke-CniApiRequest -Uri 'https://api.security.microsoft.com/api/indicators/import' -Body @{ Indicators = @() } -Token 'test-token' -MaxRetries 3 -BackoffSeconds 1
 
             $script:calls | Should -Be 2
             Assert-MockCalled Start-Sleep -Times 1 -Exactly
@@ -153,7 +187,7 @@ Describe 'PreventKit CNI rate-limited API request' {
             }
             Mock Start-Sleep { }
 
-            { Invoke-CniApiRequest -Uri 'https://api.security.microsoft.com/api/indicators/import' -Body @{ Indicators = @() } -MaxRetries 2 -BackoffSeconds 0 } | Should -Throw
+            { Invoke-CniApiRequest -Uri 'https://api.security.microsoft.com/api/indicators/import' -Body @{ Indicators = @() } -Token 'test-token' -MaxRetries 2 -BackoffSeconds 0 } | Should -Throw
 
             Assert-MockCalled Invoke-RestMethod -Times 3 -Exactly
         }
@@ -166,18 +200,20 @@ Describe 'PreventKit CNI managed entry removal' {
         InModuleScope PreventKit {
             $script:captured = @()
             Mock Invoke-CniApiRequest {
-                param($Uri, $Body)
-                $script:captured += [pscustomobject]@{ Uri = $Uri; Body = $Body }
+                param($Uri, $Body, $Token)
+                $script:captured += [pscustomobject]@{ Uri = $Uri; Body = $Body; Token = $Token }
                 return $null
             }
             Mock Start-Sleep { }
 
-            Remove-CniManagedEntry -Id @('1', '2', '3') -BatchSize 2 -RateLimitPerMinute 0
+            Remove-CniManagedEntry -Id @('1', '2', '3') -BatchSize 2 -RateLimitPerMinute 0 -Token 'test-token'
 
             $script:captured.Count | Should -Be 2
             $script:captured[0].Uri | Should -Match 'BatchDelete'
             @($script:captured[0].Body.IndicatorIds) | Should -Be @('1', '2')
             @($script:captured[1].Body.IndicatorIds) | Should -Be @('3')
+            $script:captured[0].Token | Should -Be 'test-token'
+            $script:captured[1].Token | Should -Be 'test-token'
         }
     }
     It 'paces remove batches to respect the rate limit' {
@@ -185,7 +221,7 @@ Describe 'PreventKit CNI managed entry removal' {
             Mock Invoke-CniApiRequest { return $null }
             Mock Start-Sleep { }
 
-            Remove-CniManagedEntry -Id @('1', '2', '3') -BatchSize 1 -RateLimitPerMinute 60
+            Remove-CniManagedEntry -Id @('1', '2', '3') -BatchSize 1 -RateLimitPerMinute 60 -Token 'test-token'
 
             Assert-MockCalled Invoke-CniApiRequest -Times 3 -Exactly
             Assert-MockCalled Start-Sleep -Times 2 -Exactly
@@ -197,7 +233,7 @@ Describe 'PreventKit CNI managed entry removal' {
             Mock Invoke-CniApiRequest { return $null }
             Mock Start-Sleep { }
 
-            Remove-CniManagedEntry -Id @('1', '2') -BatchSize 1 -RateLimitPerMinute 0
+            Remove-CniManagedEntry -Id @('1', '2') -BatchSize 1 -RateLimitPerMinute 0 -Token 'test-token'
 
             Assert-MockCalled Start-Sleep -Times 0 -Exactly
         }
@@ -221,12 +257,14 @@ Describe 'PreventKit CNI reconciliation' {
             Mock Add-CniManagedEntry { return $Projections }
             Mock Remove-CniManagedEntry { }
 
-            $result = Invoke-CniReconciliation -DesiredEntries $desired -CurrentEntries $current -Capacity 10
+            $result = Invoke-CniReconciliation -DesiredEntries $desired -CurrentEntries $current -Capacity 10 -Token 'test-token'
 
             $result.Status | Should -Be 'Reconciled'
             Assert-MockCalled Add-CniManagedEntry -Times 1 -Exactly -ParameterFilter { @($Projections | Where-Object { $_.Value -eq 'evil.example.com' }).Count -eq 1 }
             Assert-MockCalled Remove-CniManagedEntry -Times 1 -Exactly -ParameterFilter { @($Id | Where-Object { $_ -eq '2' }).Count -eq 1 }
             Assert-MockCalled Remove-CniManagedEntry -Times 0 -Exactly -ParameterFilter { @($Id | Where-Object { $_ -eq '3' }).Count -eq 1 }
+            Assert-MockCalled Add-CniManagedEntry -Times 1 -Exactly -ParameterFilter { $Token -eq 'test-token' }
+            Assert-MockCalled Remove-CniManagedEntry -Times 1 -Exactly -ParameterFilter { $Token -eq 'test-token' }
         }
     }
 
@@ -239,7 +277,7 @@ Describe 'PreventKit CNI reconciliation' {
             Mock Add-CniManagedEntry { }
             Mock Remove-CniManagedEntry { }
 
-            $result = Invoke-CniReconciliation -DesiredEntries $desired -CurrentEntries @() -Capacity 0
+            $result = Invoke-CniReconciliation -DesiredEntries $desired -CurrentEntries @() -Capacity 0 -Token 'test-token'
 
             $result.Status | Should -Be 'Aborted'
             $result.Preflight.Passed | Should -BeFalse
@@ -260,7 +298,7 @@ Describe 'PreventKit CNI reconciliation' {
             Mock Add-CniManagedEntry { }
             Mock Remove-CniManagedEntry { }
 
-            $result = Invoke-CniReconciliation -DesiredEntries $desired -CurrentEntries $afterFirstRun -Capacity 10
+            $result = Invoke-CniReconciliation -DesiredEntries $desired -CurrentEntries $afterFirstRun -Capacity 10 -Token 'test-token'
 
             $result.Status | Should -Be 'NoChanges'
             Assert-MockCalled Add-CniManagedEntry -Times 0 -Exactly

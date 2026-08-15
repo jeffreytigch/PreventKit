@@ -149,7 +149,7 @@ Describe 'PreventKit global exceptions in a full run' {
             Mock Remove-CniManagedEntry { }
 
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -ExceptionDirectory $exceptionsDir `
-                -CniCapacity 10 -CniCurrentEntries $currentCni
+                -CniCapacity 10 -CniCurrentEntries $currentCni -CniToken 'test-token'
 
             Assert-MockCalled Add-CniManagedEntry -Times 0 -Exactly -ParameterFilter {
                 @($Projections | Where-Object { $_.Value -match 'anydesk' }).Count -gt 0
