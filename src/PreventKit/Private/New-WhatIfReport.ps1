@@ -6,7 +6,9 @@ Render a human-readable WhatIf run report from the desired state.
 Produces a readable report listing the desired state as services and blockable
 addresses, what invocation exceptions and global exceptions suppressed, and a
 section per catalogue contribution showing what each enabled catalogue
-declaration contributed. Nothing is written to any enforcement destination.
+declaration contributed, including the addresses that were subsumed by a
+broader wildcard entry and the addresses that were skipped as unrepresentable.
+Nothing is written to any enforcement destination.
 
 .OUTPUTS
 System.String, one line per report line.
@@ -79,6 +81,22 @@ function New-WhatIfReport {
             -Format { param($service) "  - $($service.Id) ($($service.Name))" }
         $lines += Format-ReportList -Title 'Blockable addresses' -Items $cAddresses -Indent 2 `
             -Format { param($address) "  - $($address.Value) ($($address.Type))" }
+
+        $cUnrepresentable = @()
+        $unrepresentableProperty = $contribution.PSObject.Properties['Unrepresentable']
+        if ($null -ne $unrepresentableProperty -and $null -ne $unrepresentableProperty.Value) {
+            $cUnrepresentable = @($unrepresentableProperty.Value)
+        }
+        $lines += Format-ReportList -Title 'Unrepresentable' -Items $cUnrepresentable -Indent 2 `
+            -Format { param($entry) "  - $($entry.Value) ($($entry.Reason))" }
+
+        $cSubsumed = @()
+        $subsumedProperty = $contribution.PSObject.Properties['Subsumed']
+        if ($null -ne $subsumedProperty -and $null -ne $subsumedProperty.Value) {
+            $cSubsumed = @($subsumedProperty.Value)
+        }
+        $lines += Format-ReportList -Title 'Subsumed blockable addresses' -Items $cSubsumed -Indent 2 `
+            -Format { param($entry) "  - $($entry.Value)" }
 
         $cniTable = Get-CniProjectionTable -Snapshot $contribution
         if (@($cniTable.Projections).Count -gt 0 -or @($cniTable.Unprojectable).Count -gt 0) {

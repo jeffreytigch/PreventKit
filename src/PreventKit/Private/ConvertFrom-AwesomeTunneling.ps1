@@ -12,8 +12,8 @@ tunneling endpoints, so links to them are skipped and recorded as
 unrepresentable. Non-bullet markdown content is ignored.
 
 .OUTPUTS
-System.Management.Automation.PSCustomObject with Services, BlockableAddresses
-and Unrepresentable collections.
+System.Management.Automation.PSCustomObject with Services, BlockableAddresses,
+Unrepresentable and Subsumed collections.
 #>
 function ConvertFrom-AwesomeTunneling {
     [CmdletBinding()]
@@ -107,5 +107,6 @@ function ConvertFrom-AwesomeTunneling {
         Services           = @($services.Values)
         BlockableAddresses = @($blockableAddresses)
         Unrepresentable    = @($unrepresentable)
+        Subsumed           = @()
     }
 }

@@ -47,6 +47,7 @@ function New-FailedCatalogueSnapshot {
                 Services           = 0
                 BlockableAddresses = 0
                 Unrepresentable    = 0
+                Subsumed           = 0
             }
             UsedLastKnownGood = $false
             FailureReason     = $FailureReason
@@ -54,6 +55,7 @@ function New-FailedCatalogueSnapshot {
         Services           = @()
         BlockableAddresses = @()
         Unrepresentable    = @()
+        Subsumed           = @()
         Validation         = [pscustomobject]@{
             Status = 'Failure'
             Checks = @(

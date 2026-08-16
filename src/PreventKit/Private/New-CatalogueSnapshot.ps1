@@ -40,6 +40,7 @@ function New-CatalogueSnapshot {
         Services           = @($Parsed.Services).Count
         BlockableAddresses = @($Parsed.BlockableAddresses).Count
         Unrepresentable    = @($Parsed.Unrepresentable).Count
+        Subsumed           = @($Parsed.Subsumed).Count
     }
 
     $fingerprint = [pscustomobject]@{
@@ -69,6 +70,7 @@ function New-CatalogueSnapshot {
         Services            = @($Parsed.Services)
         BlockableAddresses  = @($Parsed.BlockableAddresses)
         Unrepresentable     = @($Parsed.Unrepresentable)
+        Subsumed            = @($Parsed.Subsumed)
         Validation          = $Validation
         DestinationSettings = $destinationSettings
     }

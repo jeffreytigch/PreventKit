@@ -49,14 +49,18 @@ Describe 'PreventKit catalogue retrieval and validation' {
         $ip.ServiceId | Should -Be 'lolrmm/Ammyy Admin'
     }
 
-    It 'logs and counts entries the adapter cannot represent' {
+    It 'logs and counts entries the adapter cannot represent and records subsumed addresses separately' {
         $snapshot = @(Invoke-PreventKitRun -CatalogueDirectory $dirtyDir)[0]
 
-        $snapshot.Fingerprint.ParsedCounts.Unrepresentable | Should -Be 3
+        $snapshot.Fingerprint.ParsedCounts.Unrepresentable | Should -Be 2
+        $snapshot.Fingerprint.ParsedCounts.Subsumed | Should -Be 1
         $snapshot.Fingerprint.ParsedCounts.BlockableAddresses | Should -Be 4
 
+        $subsumedValues = @($snapshot.Subsumed | ForEach-Object { $_.Value })
+        $subsumedValues | Should -Contain 'relay-[a-f0-9]{8}.net.anydesk.com:443'
+
         $unrepresentableValues = @($snapshot.Unrepresentable | ForEach-Object { $_.Value })
-        $unrepresentableValues | Should -Contain 'relay-[a-f0-9]{8}.net.anydesk.com:443'
+        $unrepresentableValues | Should -Not -Contain 'relay-[a-f0-9]{8}.net.anydesk.com:443'
         $unrepresentableValues | Should -Contain 'upload_data.qq.com'
         $unrepresentableValues | Should -Contain 'agents*-cloud.acronis.com'
 
@@ -192,6 +196,29 @@ Describe 'PreventKit desired state and WhatIf report' {
         $text | Should -Match 'Services \(0\):'
         $text | Should -Match 'Blockable addresses \(0\):'
         $text | Should -Match 'Validation: Failure'
+    }
+
+    It 'a WhatIf report shows subsumed blockable addresses alongside unrepresentable per contribution' {
+        $report = @(Invoke-PreventKitRun -CatalogueDirectory $dirtyDir -WhatIf)
+        $text = $report -join "`n"
+
+        $text | Should -Match 'Subsumed blockable addresses \(1\):'
+        $text | Should -Match ([regex]::Escape('relay-[a-f0-9]{8}.net.anydesk.com:443'))
+        $text | Should -Match 'Unrepresentable \(2\):'
+        $text | Should -Match ([regex]::Escape('upload_data.qq.com'))
+        $text | Should -Match ([regex]::Escape('agents*-cloud.acronis.com'))
+    }
+
+    It 'subsumed addresses never enter the desired state, CNI projections, or TABL entries' {
+        InModuleScope PreventKit -Parameters @{ dirtyDir = $dirtyDir } {
+            $snapshots = @(Invoke-PreventKitRun -CatalogueDirectory $dirtyDir)
+            $desiredState = Get-DesiredState -Snapshot $snapshots
+
+            @($desiredState.BlockableAddresses | Where-Object { $_.Value -eq 'relay-[a-f0-9]{8}.net.anydesk.com:443' }).Count | Should -Be 0
+
+            $cniProjections = @(Get-CniDesiredProjections -DesiredState $desiredState)
+            @($cniProjections | Where-Object { $_.Value -eq 'relay-[a-f0-9]{8}.net.anydesk.com:443' }).Count | Should -Be 0
+        }
     }
 
     It 'a WhatIf run completes without modifying any enforcement destination' {

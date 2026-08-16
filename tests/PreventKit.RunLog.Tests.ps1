@@ -4,6 +4,7 @@ BeforeAll {
 
     $fixtureRoot = Join-Path $PSScriptRoot 'fixtures'
     $cleanDir    = Join-Path $fixtureRoot 'clean'
+    $dirtyDir    = Join-Path $fixtureRoot 'dirty'
 }
 
 Describe 'PreventKit run log' {
@@ -75,6 +76,23 @@ Describe 'PreventKit run log' {
 
             $text | Should -Match 'Status: Partial'
             $text | Should -Match 'Tabl: Aborted'
+        }
+    }
+
+    It 'the run log entry and per-run report reflect the subsumed count alongside unrepresentable' {
+        $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
+        InModuleScope PreventKit -Parameters @{ logDir = $logDir; dirtyDir = $dirtyDir } {
+            $null = Invoke-PreventKitRun -CatalogueDirectory $dirtyDir -LogDirectory $logDir
+
+            $entry = @(Get-PreventKitRunLog -LogDirectory $logDir)[0]
+            $entry.SourceFingerprints[0].ParsedCounts.Subsumed | Should -Be 1
+            $entry.SourceFingerprints[0].ParsedCounts.Unrepresentable | Should -Be 2
+
+            $report = @(New-PreventKitRunReport -LogEntry $entry)
+            $text = $report -join "`n"
+
+            $text | Should -Match 'subsumed=1'
+            $text | Should -Match 'unrepresentable=2'
         }
     }
 

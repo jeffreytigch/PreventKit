@@ -40,6 +40,10 @@ _Avoid_: Domain, indicator
 A URL, domain, or IP address that represents a Service or stands alone when no service identity is known.
 _Avoid_: Indicator, IOC
 
+**Subsumed blockable address**:
+An address that the desired state would enforce anyway through a broader already-enforced wildcard entry, so the catalogue does not need it. A candidate is subsumed when its normalized tail equals — or ends, at a label boundary, with — the root of an existing wildcard domain entry; it is distinct from an address with no safe projection, which stays unrepresentable.
+_Avoid_: Duplicate entry, redundant address
+
 **Enforcement destination**:
 A Microsoft 365 control surface to which PreventKit can publish a blocking rule, such as the Tenant Allow/Block List, Custom Network Indicators, or Global Secure Access web controls.
 _Avoid_: Output, sink, integration

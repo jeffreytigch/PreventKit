@@ -5,8 +5,9 @@ Render a human-readable per-run report from a run log entry.
 .DESCRIPTION
 Produces a readable report for one Run: the run id, status and timing, the
 catalogue directory, each source fingerprint (catalogue, source, hash,
-validation status, and any last-known-good fallback), the exceptions applied,
-and the outcome of each destination reconciliation.
+validation status, parsed counts including subsumed, and any last-known-good
+fallback), the exceptions applied, and the outcome of each destination
+reconciliation.
 
 .PARAMETER LogEntry
 One run log entry as returned by Get-PreventKitRunLog.
@@ -44,6 +45,23 @@ function New-PreventKitRunReport {
         $fallbackFlag = if ($fingerprint.UsedLastKnownGood) { ' [last known good fallback]' } else { '' }
         $lines += "  - $($fingerprint.CatalogueName): $($fingerprint.SourceLocation)"
         $lines += "      hash=$($fingerprint.ContentHash) validation=$($fingerprint.ValidationStatus)$fallbackFlag"
+        $parsedCountsProperty = $fingerprint.PSObject.Properties['ParsedCounts']
+        if ($null -ne $parsedCountsProperty -and $null -ne $parsedCountsProperty.Value) {
+            $parsedCounts = $parsedCountsProperty.Value
+            $servicesCount = 0
+            $servicesProperty = $parsedCounts.PSObject.Properties['Services']
+            if ($null -ne $servicesProperty) { $servicesCount = $servicesProperty.Value }
+            $blockableCount = 0
+            $blockableProperty = $parsedCounts.PSObject.Properties['BlockableAddresses']
+            if ($null -ne $blockableProperty) { $blockableCount = $blockableProperty.Value }
+            $unrepresentableCount = 0
+            $unrepresentableProperty = $parsedCounts.PSObject.Properties['Unrepresentable']
+            if ($null -ne $unrepresentableProperty) { $unrepresentableCount = $unrepresentableProperty.Value }
+            $subsumedCount = 0
+            $subsumedProperty = $parsedCounts.PSObject.Properties['Subsumed']
+            if ($null -ne $subsumedProperty) { $subsumedCount = $subsumedProperty.Value }
+            $lines += "      services=$servicesCount blockable=$blockableCount unrepresentable=$unrepresentableCount subsumed=$subsumedCount"
+        }
         if ($fingerprint.FailureReason) {
             $lines += "      failure: $($fingerprint.FailureReason)"
         }
