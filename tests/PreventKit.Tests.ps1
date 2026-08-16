@@ -145,11 +145,6 @@ Describe 'PreventKit desired state and WhatIf report' {
             $lolrmm.Fingerprint.SourceLocation | Should -Be (Join-Path $multiDir 'lolrmm.csv')
             @($lolrmm.Services).Count | Should -Be 2
             @($lolrmm.BlockableAddresses).Count | Should -Be 3
-
-            $tunneling = $desiredState.Contributions | Where-Object { $_.CatalogueName -eq 'tunneling' }
-            $tunneling.Scope | Should -Be 'tunneling'
-            @($tunneling.Services).Count | Should -Be 2
-            @($tunneling.BlockableAddresses).Count | Should -Be 2
         }
     }
 
@@ -184,7 +179,6 @@ Describe 'PreventKit desired state and WhatIf report' {
 
         $text | Should -Match 'Catalogue contributions'
         $text | Should -Match ([regex]::Escape('lolrmm'))
-        $text | Should -Match ([regex]::Escape('tunneling'))
         $text | Should -Match ([regex]::Escape('cloudflare.com'))
     }
 

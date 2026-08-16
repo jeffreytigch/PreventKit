@@ -13,7 +13,6 @@ Every Run is either a manual invocation or a scheduled invocation; both drive th
 A **catalogue declaration** enables a block catalogue and sets its scope. Declarations live in `catalogues/`:
 
 - `lolrmm.catalog.psd1` — the lolrmm.io RMM domains CSV (`LolRmmCsv` adapter).
-- `tunneling.catalog.psd1` — the Awesome Tunneling markdown (`AwesomeTunneling` adapter).
 
 A catalogue source that fails retrieval or validation is skipped in favour of its **last known good snapshot** when one exists; otherwise the Run still completes and records the failure.
 
