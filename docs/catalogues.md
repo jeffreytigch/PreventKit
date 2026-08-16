@@ -10,4 +10,4 @@ As stated in README.md:
 
 - The source of the catalogue should present their list in a format that is natively ingestable by PowerShell (i.e. CSV, JSON).
 - The catalogue should be accompanied by an transformation script and tests, to adapt the source format into the native format for PreventKit.
-- The source of the catalogue is assumed to be moderated by the installer. No checks need to be done in PreventKit to mitigate risks.
+- The source of the catalogue is assumed to be moderated by the user of the module. No checks need to be done in PreventKit to mitigate risks.
