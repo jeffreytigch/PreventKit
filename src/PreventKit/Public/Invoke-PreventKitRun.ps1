@@ -90,13 +90,13 @@ function Invoke-PreventKitRun {
         [string[]]$ExceptionKey = @(),
 
         [Parameter()]
-        [string]$ExceptionDirectory,
+        [string]$ExceptionDirectory = "./exceptions",
 
         [Parameter()]
-        [string]$StateDirectory,
+        [string]$StateDirectory = "./state",
 
         [Parameter()]
-        [string]$LogDirectory,
+        [string]$LogDirectory = "./logs",
 
         [Parameter()]
         [ValidateRange(-1, [int]::MaxValue)]
