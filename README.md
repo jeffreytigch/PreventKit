@@ -8,11 +8,28 @@ A **Run** retrieves each enabled **catalogue source**, parses it with a **source
 
 Every Run is either a manual invocation or a scheduled invocation; both drive the same engine.
 
+A simple, visual flowchart of the process:
+
+```mermaid
+flowchart LR
+    A{Run} --> B[Retrieve and parse catalogue sources]
+    Source1([LOLRMM]) -.- B
+    B --> C[Apply exceptions]
+    C --> D[Compute desired state]
+    D --> E[Apply entries from catalogue sources to M365 services]
+    Destination1([Tenant Allow/Block List]) -.- E
+    Destination2([Custom Network Indicators]) -.- E
+    E --> F{Done}
+```
+
 ## Catalogue sources
 
 A **catalogue declaration** enables a block catalogue and sets its scope. Declarations live in `catalogues/`:
 
 - `lolrmm.catalog.psd1` — the lolrmm.io RMM domains CSV (`LolRmmCsv` adapter).
+
+> [!NOTE]
+> Other catalogues will be added in the future.
 
 A catalogue source that fails retrieval or validation is skipped in favour of its **last known good snapshot** when one exists; otherwise the Run still completes and records the failure.
 
@@ -56,6 +73,20 @@ reconciles Custom Network Indicators without a token fails before any request:
 $token = (az account get-access-token --resource 'https://api.securitycenter.microsoft.com' | ConvertFrom-Json).accessToken
 Invoke-PreventKitRun -CatalogueDirectory ./catalogues -CniCapacity 15000 -CniToken $token
 ```
+
+## Capacity limits
+
+Enforcement destinations impose license-dependent entry limits. Choose the `-*Capacity` parameters to fit both the planned managed-entry count and your tenant's limits; the **capacity preflight** aborts a destination when the planned count would exceed the supplied capacity.
+
+| Destination | License | Block entry limit |
+| --- | --- | --- |
+| **CNI** — Custom Network Indicators | Defender for Endpoint | 15,000 indicators per tenant |
+
+| Destination | License | Block entry limit |
+| --- | --- | --- |
+| **TABL** — Tenant Allow/Block List | M365 without Defender for Office 365 | 500 |
+| **TABL** — Tenant Allow/Block List | Defender for Office 365 Plan 1 (BP, E3) | 1,000 |
+| **TABL** — Tenant Allow/Block List | Defender for Office 365 Plan 2 (E5, E7) | 10,000 |
 
 ## Scheduled runs
 
