@@ -31,27 +31,52 @@ Directory where run log entries are written.
 
 .PARAMETER TablCapacity
 When supplied, reconcile the Tenant Allow/Block List to the desired state.
+When -TablAuto is specified, this parameter is ignored and the default P1
+capacity (5000) is used.
 
 .PARAMETER CniCapacity
 When supplied, reconcile Custom Network Indicators to the desired state.
+When -CniAuto is specified, this parameter is ignored and the default capacity
+(15000) is used.
 
 .PARAMETER CniToken
 The access token for the MDE Custom Network Indicators API, supplied by the
 caller. Required when CniCapacity is supplied so reconciliation never sends an
 unauthenticated request. Any acquisition method works (interactive, client
-certificate, or managed identity).
+certificate, or managed identity). Ignored when -CniAuto is specified.
 
 .PARAMETER TablCurrentEntries
-Raw current TABL URL block entries (as returned by the read side).
+Raw current TABL URL block entries (as returned by the read side). Ignored
+when -TablAuto is specified.
 
 .PARAMETER CniCurrentEntries
-Raw current CNI indicators (as returned by the read side).
+Raw current CNI indicators (as returned by the read side). Ignored when
+-CniAuto is specified.
+
+.PARAMETER TablAuto
+When specified, automatically configure the TABL destination: use the default
+Defender for Office 365 Plan 1 capacity (5000), verify an active Exchange
+Online session, and read current URL block entries from the tenant. No manual
+TablCapacity or TablCurrentEntries required.
+
+.PARAMETER CniAuto
+When specified, automatically configure the CNI destination: acquire the
+Defender token from the signed-in Azure CLI session, verify the caller can
+read and write CNI, and read the current indicator state from the MDE API.
+No manual CniToken or CniCurrentEntries required.
+
+.PARAMETER TablCapacityP1
+When specified with -TablCapacity (without -TablAuto), use the Defender for
+Office 365 Plan 1 default capacity (5000) instead of the supplied value.
 
 .EXAMPLE
 Start-PreventKitRun -CatalogueDirectory .\catalogues -StateDirectory .\state -LogDirectory .\logs
 
 .EXAMPLE
 Start-PreventKitRun -CatalogueDirectory .\catalogues -LogDirectory .\logs; if ($LASTEXITCODE) { throw }
+
+.EXAMPLE
+Start-PreventKitRun -CatalogueDirectory .\catalogues -TablAuto -CniAuto -LogDirectory .\logs
 
 .OUTPUTS
 System.Int32, the process exit code: 0 on success, 1 on failure.
@@ -93,7 +118,16 @@ function Start-PreventKitRun {
 
         [Parameter()]
         [AllowEmptyCollection()]
-        [object[]]$CniCurrentEntries = @()
+        [object[]]$CniCurrentEntries = @(),
+
+        [Parameter()]
+        [switch]$TablAuto,
+
+        [Parameter()]
+        [switch]$CniAuto,
+
+        [Parameter()]
+        [switch]$TablCapacityP1
     )
 
     $globalExceptionKey = @()
@@ -116,6 +150,7 @@ function Start-PreventKitRun {
             -TablCapacity $TablCapacity -CniCapacity $CniCapacity `
             -CniToken $CniToken `
             -TablCurrentEntries $TablCurrentEntries -CniCurrentEntries $CniCurrentEntries `
+            -TablAuto:$TablAuto -CniAuto:$CniAuto -TablCapacityP1:$TablCapacityP1 `
             -ErrorAction Stop
 
         return 0

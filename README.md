@@ -1,6 +1,6 @@
 # PreventKit
 
-PreventKit manages blocking rules for frequently abused services in one Microsoft 365 tenant. It turns curated external block catalogues into rules for Microsoft enforcement destinations while preserving administrator control.
+PreventKit manages blocking rules for frequently abused services in one Microsoft 365 tenant. It converts curated 'living off the land' lists into block rules for Microsoft 365 services. It aims to be as non-intrusive as possible, while providing preventive measures in your Microsoft 365 tenant in functionality you're already paying for.
 
 ## How it works
 

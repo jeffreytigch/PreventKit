@@ -46,23 +46,48 @@ Directory where run log entries are written.
 
 .PARAMETER TablCapacity
 When supplied, reconcile the Tenant Allow/Block List to the desired state
-using TablCurrentEntries as the current entries.
+using TablCurrentEntries as the current entries. When -TablAuto is specified,
+this parameter is ignored and the default P1 capacity (5000) is used.
 
 .PARAMETER CniCapacity
 When supplied, reconcile Custom Network Indicators to the desired state using
-CniCurrentEntries as the current entries.
+CniCurrentEntries as the current entries. When -CniAuto is specified, this
+parameter is ignored and the default capacity (15000) is used.
 
 .PARAMETER CniToken
 The access token for the MDE Custom Network Indicators API, supplied by the
 caller. Required when CniCapacity is supplied so reconciliation never sends an
 unauthenticated request. Any acquisition method works (interactive, client
-certificate, or managed identity).
+certificate, or managed identity). Ignored when -CniAuto is specified.
 
 .PARAMETER TablCurrentEntries
-Raw current TABL URL block entries (as returned by the read side).
+Raw current TABL URL block entries (as returned by the read side). Ignored
+when -TablAuto is specified.
 
 .PARAMETER CniCurrentEntries
-Raw current CNI indicators (as returned by the read side).
+Raw current CNI indicators (as returned by the read side). Ignored when
+-CniAuto is specified.
+
+.PARAMETER TablAuto
+When specified, automatically configure the TABL destination: use the default
+Defender for Office 365 Plan 1 capacity (5000), verify an active Exchange
+Online session, and read current URL block entries from the tenant. No manual
+TablCapacity or TablCurrentEntries required.
+
+.PARAMETER CniAuto
+When specified, automatically configure the CNI destination: acquire the
+Defender token from the signed-in Azure CLI session, verify the caller can
+read and write CNI, and read the current indicator state from the MDE API.
+No manual CniToken or CniCurrentEntries required.
+
+.PARAMETER TablCapacityP1
+When specified with -TablCapacity (without -TablAuto), use the Defender for
+Office 365 Plan 1 default capacity (5000) instead of the supplied value.
+
+.PARAMETER DestinationOutcome
+Output variable to receive per-destination configuration and reconciliation
+outcomes. Each entry contains Destination, ConfigurationMode, Status, and
+details about what was selected, validated, reconciled, skipped, or unavailable.
 
 .EXAMPLE
 Invoke-PreventKitRun -CatalogueDirectory .\catalogues -StateDirectory .\state -LogDirectory .\logs
@@ -72,6 +97,12 @@ Invoke-PreventKitRun -CatalogueDirectory .\catalogues -ExceptionKey 'service:lol
 
 .EXAMPLE
 Invoke-PreventKitRun -CatalogueDirectory .\tests\fixtures\clean
+
+.EXAMPLE
+Invoke-PreventKitRun -CatalogueDirectory .\catalogues -TablAuto -CniAuto -LogDirectory .\logs
+
+.EXAMPLE
+Invoke-PreventKitRun -CatalogueDirectory .\catalogues -TablCapacity 5000 -TablCapacityP1 -LogDirectory .\logs
 
 .OUTPUTS
 System.Management.Automation.PSCustomObject, one per enabled catalogue
@@ -115,7 +146,20 @@ function Invoke-PreventKitRun {
 
         [Parameter()]
         [AllowEmptyCollection()]
-        [object[]]$CniCurrentEntries = @()
+        [object[]]$CniCurrentEntries = @(),
+
+        [Parameter()]
+        [switch]$TablAuto,
+
+        [Parameter()]
+        [switch]$CniAuto,
+
+        [Parameter()]
+        [switch]$TablCapacityP1,
+
+        [Parameter()]
+        [Alias('DestinationOutcome')]
+        [string]$DestinationOutcomeVariable
     )
 
     $startedAt = [datetime]::UtcNow
@@ -126,6 +170,7 @@ function Invoke-PreventKitRun {
     $globalExceptionKey   = @()
     $snapshots            = @()
     $destinationOutcomes  = @()
+    $destinationConfigurations = @()
 
     try {
         foreach ($key in @($ExceptionKey)) {
@@ -173,25 +218,150 @@ function Invoke-PreventKitRun {
             return
         }
 
-        if ($TablCapacity -ge 0) {
-            $destinationOutcomes += Invoke-TablReconciliation -DesiredEntries @($desiredState.BlockableAddresses) `
-                -CurrentEntries $TablCurrentEntries -Capacity $TablCapacity
+        # Resolve TABL configuration
+        $tablConfig = $null
+        if ($TablAuto) {
+            $tablConfig = Get-AutoTablConfiguration
+            $destinationConfigurations += @{
+                Destination         = 'Tabl'
+                ConfigurationMode   = 'Auto'
+                Capacity            = $tablConfig.Capacity
+                Status              = 'Selected'
+                ValidationStatus    = 'Validated'
+                SelectionReason     = 'Default P1 capacity with auto-detected Exchange Online session'
+            }
+        }
+        elseif ($TablCapacity -ge 0) {
+            $effectiveCapacity = if ($TablCapacityP1) { 5000 } else { $TablCapacity }
+            $tablConfig = [pscustomobject]@{
+                Capacity         = $effectiveCapacity
+                CurrentEntries   = $TablCurrentEntries
+                SessionVerified  = $false
+                ConfigurationMode = 'Manual'
+            }
+            $destinationConfigurations += @{
+                Destination         = 'Tabl'
+                ConfigurationMode   = 'Manual'
+                Capacity            = $effectiveCapacity
+                Status              = 'Selected'
+                ValidationStatus    = 'Pending'
+                SelectionReason     = if ($TablCapacityP1) { 'Manual capacity with P1 default' } else { 'Manual capacity' }
+            }
+        }
+        else {
+            $destinationConfigurations += @{
+                Destination         = 'Tabl'
+                ConfigurationMode   = 'None'
+                Capacity            = $null
+                Status              = 'Skipped'
+                ValidationStatus    = 'NotConfigured'
+                SelectionReason     = 'No TABL capacity specified'
+            }
         }
 
-        if ($CniCapacity -ge 0) {
-            if ([string]::IsNullOrWhiteSpace($CniToken)) {
-                throw 'A CNI Run requires a token: supply -CniToken with an MDE Custom Network Indicators API access token.'
+        # Resolve CNI configuration
+        $cniConfig = $null
+        if ($CniAuto) {
+            $cniConfig = Get-AutoCniConfiguration
+            $destinationConfigurations += @{
+                Destination         = 'Cni'
+                ConfigurationMode   = 'Auto'
+                Capacity            = $cniConfig.Capacity
+                Status              = 'Selected'
+                ValidationStatus    = 'Validated'
+                SelectionReason     = 'Auto-configured via Azure CLI token'
             }
+        }
+        elseif ($CniCapacity -ge 0) {
+            if ([string]::IsNullOrWhiteSpace($CniToken)) {
+                throw 'A CNI Run requires a token: supply -CniToken with an MDE Custom Network Indicators API access token, or use -CniAuto to acquire it automatically.'
+            }
+            $cniConfig = [pscustomobject]@{
+                Token                  = $CniToken
+                Capacity               = $CniCapacity
+                CurrentEntries         = $CniCurrentEntries
+                AuthorizationVerified  = $false
+                ConfigurationMode      = 'Manual'
+            }
+            $destinationConfigurations += @{
+                Destination         = 'Cni'
+                ConfigurationMode   = 'Manual'
+                Capacity            = $CniCapacity
+                Status              = 'Selected'
+                ValidationStatus    = 'Pending'
+                SelectionReason     = 'Manual token and capacity'
+            }
+        }
+        else {
+            $destinationConfigurations += @{
+                Destination         = 'Cni'
+                ConfigurationMode   = 'None'
+                Capacity            = $null
+                Status              = 'Skipped'
+                ValidationStatus    = 'NotConfigured'
+                SelectionReason     = 'No CNI capacity specified'
+            }
+        }
+
+        # Execute TABL reconciliation if configured
+        if ($tablConfig -and $tablConfig.ConfigurationMode -ne 'None') {
+            $currentEntries = $tablConfig.CurrentEntries
+            $capacity = $tablConfig.Capacity
+
+            $result = Invoke-TablReconciliation -DesiredEntries @($desiredState.BlockableAddresses) `
+                -CurrentEntries $currentEntries -Capacity $capacity
+
+            # Update destination configuration with reconciliation outcome
+            $config = $destinationConfigurations | Where-Object { $_.Destination -eq 'Tabl' }
+            if ($config) {
+                $preflightPassed = if ($result.PSObject.Properties['Preflight']) { $result.Preflight.Passed } else { $true }
+                $config.ValidationStatus = if ($preflightPassed) { 'Validated' } else { 'PreflightFailed' }
+                $config.ReconciliationStatus = if ($result.PSObject.Properties['Status']) { $result.Status } else { 'Unknown' }
+                $config.AddCount = if ($result.PSObject.Properties['AddCount']) { $result.AddCount } else { $null }
+                $config.RemoveCount = if ($result.PSObject.Properties['RemoveCount']) { $result.RemoveCount } else { $null }
+                $config.UnchangedCount = if ($result.PSObject.Properties['UnchangedCount']) { $result.UnchangedCount } else { $null }
+                $config.UnmanagedCollisionCount = if ($result.PSObject.Properties['UnmanagedCollisionCount']) { $result.UnmanagedCollisionCount } else { $null }
+            }
+
+            $destinationOutcomes += $result
+        }
+
+        # Execute CNI reconciliation if configured
+        if ($cniConfig -and $cniConfig.ConfigurationMode -ne 'None') {
+            $currentEntries = $cniConfig.CurrentEntries
+            $capacity = $cniConfig.Capacity
+            $token = $cniConfig.Token
+
             $cniProjections = Get-CniDesiredProjections -DesiredState $desiredState
-            $destinationOutcomes += Invoke-CniReconciliation -DesiredEntries $cniProjections `
-                -CurrentEntries $CniCurrentEntries -Capacity $CniCapacity -Token $CniToken
+            $result = Invoke-CniReconciliation -DesiredEntries $cniProjections `
+                -CurrentEntries $currentEntries -Capacity $capacity -Token $token
+
+            # Update destination configuration with reconciliation outcome
+            $config = $destinationConfigurations | Where-Object { $_.Destination -eq 'Cni' }
+            if ($config) {
+                $preflightPassed = if ($result.PSObject.Properties['Preflight']) { $result.Preflight.Passed } else { $true }
+                $config.ValidationStatus = if ($preflightPassed) { 'Validated' } else { 'PreflightFailed' }
+                $config.ReconciliationStatus = if ($result.PSObject.Properties['Status']) { $result.Status } else { 'Unknown' }
+                $config.AddCount = if ($result.PSObject.Properties['AddCount']) { $result.AddCount } else { $null }
+                $config.RemoveCount = if ($result.PSObject.Properties['RemoveCount']) { $result.RemoveCount } else { $null }
+                $config.UnchangedCount = if ($result.PSObject.Properties['UnchangedCount']) { $result.UnchangedCount } else { $null }
+                $config.UnmanagedCollisionCount = if ($result.PSObject.Properties['UnmanagedCollisionCount']) { $result.UnmanagedCollisionCount } else { $null }
+            }
+
+            $destinationOutcomes += $result
+        }
+
+        # Output destination configurations if variable requested
+        if ($PSBoundParameters.ContainsKey('DestinationOutcomeVariable')) {
+            Set-Variable -Name $DestinationOutcomeVariable -Value $destinationConfigurations -Scope 1 -Force
         }
 
         if (-not [string]::IsNullOrWhiteSpace($LogDirectory)) {
             $null = Write-PreventKitRunLog -LogDirectory $LogDirectory -RunId $runId -StartedAt $startedAt `
                 -CatalogueDirectory $CatalogueDirectory -ExceptionKey $ExceptionKey `
                 -GlobalExceptionKey $globalExceptionKey `
-                -Snapshots $snapshots -DestinationOutcomes $destinationOutcomes
+                -Snapshots $snapshots -DestinationOutcomes $destinationOutcomes `
+                -DestinationConfigurations $destinationConfigurations
             $script:preventKitRunLogEntryWritten = $true
         }
 
@@ -204,6 +374,7 @@ function Invoke-PreventKitRun {
                     -CatalogueDirectory $CatalogueDirectory -ExceptionKey $ExceptionKey `
                     -GlobalExceptionKey $globalExceptionKey `
                     -Snapshots $snapshots -DestinationOutcomes $destinationOutcomes `
+                    -DestinationConfigurations $destinationConfigurations `
                     -Status 'Failed' -ErrorMessage $_.Exception.Message
                 $script:preventKitRunLogEntryWritten = $true
             }

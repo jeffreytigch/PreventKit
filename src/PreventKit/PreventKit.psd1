@@ -7,7 +7,9 @@
     Copyright            = '(c) PreventKit. All rights reserved.'
     Description          = 'PreventKit manages blocking rules for frequently abused services in Microsoft 365.'
     PowerShellVersion    = '7.0'
-    FunctionsToExport    = @('Invoke-PreventKitRun', 'Start-PreventKitRun', 'Get-PreventKitRunLog', 'New-PreventKitRunReport')
+    FunctionsToExport    = @('Invoke-PreventKitRun', 'Start-PreventKitRun', 'Get-PreventKitRunLog', 'New-PreventKitRunReport',
+        'Register-CatalogueAdapter', 'Get-CatalogueAdapter', 'Get-CatalogueAdapterList', 'Unregister-CatalogueAdapter',
+        'Get-PreventKitModuleIntegrity', 'New-PreventKitIntegrityBaseline')
     CmdletsToExport      = @()
     VariablesToExport    = @()
     AliasesToExport      = @()

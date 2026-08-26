@@ -53,18 +53,20 @@ function Get-RunCatalogueSnapshot {
             -FailureReason $retrievalError -Fallback $failedSnapshot
     }
 
-    $parsed = switch ($adapterName) {
-        'LolRmmCsv' { ConvertFrom-LolRmmCsv -Content $sourceData.Content -Scope $scope }
-        default {
-            $errorRecord = [System.Management.Automation.ErrorRecord]::new(
-                [System.Exception]::new("Unknown source adapter '$adapterName' for catalogue '$($Declaration.Name)'."),
-                'UnknownSourceAdapter',
-                [System.Management.Automation.ErrorCategory]::InvalidArgument,
-                $adapterName
-            )
-            $PSCmdlet.ThrowTerminatingError($errorRecord)
-        }
+    # Get the adapter from the registry
+    $adapter = Get-CatalogueAdapter -Name $adapterName
+    if (-not $adapter) {
+        $errorRecord = [System.Management.Automation.ErrorRecord]::new(
+            [System.Exception]::new("Unknown source adapter '$adapterName' for catalogue '$($Declaration.Name)'. Use Register-CatalogueAdapter to add custom adapters."),
+            'UnknownSourceAdapter',
+            [System.Management.Automation.ErrorCategory]::InvalidArgument,
+            $adapterName
+        )
+        $PSCmdlet.ThrowTerminatingError($errorRecord)
     }
+
+    # Invoke the adapter's parse script
+    $parsed = & $adapter.ParseScript -Content $sourceData.Content -Scope $scope
 
     $validation = Test-CatalogueValidation -Content $sourceData.Content -Parsed $parsed
     $snapshot = New-CatalogueSnapshot -Scope $scope -Source $source -Declaration $Declaration `
