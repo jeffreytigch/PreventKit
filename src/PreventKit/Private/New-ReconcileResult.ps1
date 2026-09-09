@@ -40,12 +40,12 @@ function New-ReconcileResult {
     )
 
     [pscustomobject]@{
-        Target             = $Target
-        Status                  = $Status
-        Preflight               = $Preflight
-        AddCount                = $AddCount
-        RemoveCount             = $RemoveCount
-        UnchangedCount          = $UnchangedCount
-        UnmanagedMatchCount = $UnmanagedMatchCount
+        Target                = $Target
+        Status                = $Status
+        Preflight             = $Preflight
+        AddCount              = $AddCount
+        RemoveCount           = $RemoveCount
+        UnchangedCount        = $UnchangedCount
+        UnmanagedMatchCount   = $UnmanagedMatchCount
     }
 }

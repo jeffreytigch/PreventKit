@@ -72,6 +72,6 @@ function New-CatalogueSnapshot {
         Unrepresentable     = @($Parsed.Unrepresentable)
         Covered             = @($Parsed.Covered)
         Validation          = $Validation
-        TargetSettings = $targetSettings
+        TargetSettings      = $targetSettings
     }
 }

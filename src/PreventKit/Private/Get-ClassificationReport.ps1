@@ -27,9 +27,9 @@ function Get-ClassificationReport {
     $unmanagedCount = @($entries | Where-Object { $_.Classification -eq 'UnmanagedMatch' }).Count
 
     [pscustomobject]@{
-        Entries                 = $entries
-        TotalCount              = $entries.Count
-        ManagedCount            = $managedCount
-        UnmanagedMatchCount = $unmanagedCount
+        Entries               = $entries
+        TotalCount            = $entries.Count
+        ManagedCount          = $managedCount
+        UnmanagedMatchCount   = $unmanagedCount
     }
 }

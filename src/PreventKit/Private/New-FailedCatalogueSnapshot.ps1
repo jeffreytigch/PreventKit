@@ -66,6 +66,6 @@ function New-FailedCatalogueSnapshot {
                 }
             )
         }
-        TargetSettings = $targetSettings
+        TargetSettings      = $targetSettings
     }
 }

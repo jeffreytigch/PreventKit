@@ -93,17 +93,17 @@ function Write-PreventKitRunLog {
             return $obj.$name
         }
         [pscustomobject]@{
-            Target              = & $getProp $config 'Target'
-            ConfigurationMode        = & $getProp $config 'ConfigurationMode'
-            Capacity                 = & $getProp $config 'Capacity'
-            Status                   = & $getProp $config 'Status'
-            ValidationStatus         = if (& $hasProp $config 'ValidationStatus') { & $getProp $config 'ValidationStatus' } else { $null }
-            ReconciliationStatus     = if (& $hasProp $config 'ReconciliationStatus') { & $getProp $config 'ReconciliationStatus' } else { $null }
-            SelectionReason          = if (& $hasProp $config 'SelectionReason') { & $getProp $config 'SelectionReason' } else { $null }
-            AddCount                 = if (& $hasProp $config 'AddCount') { & $getProp $config 'AddCount' } else { $null }
-            RemoveCount              = if (& $hasProp $config 'RemoveCount') { & $getProp $config 'RemoveCount' } else { $null }
-            UnchangedCount           = if (& $hasProp $config 'UnchangedCount') { & $getProp $config 'UnchangedCount' } else { $null }
-            UnmanagedMatchCount  = if (& $hasProp $config 'UnmanagedMatchCount') { & $getProp $config 'UnmanagedMatchCount' } else { $null }
+            Target                    = & $getProp $config 'Target'
+            ConfigurationMode         = & $getProp $config 'ConfigurationMode'
+            Capacity                  = & $getProp $config 'Capacity'
+            Status                    = & $getProp $config 'Status'
+            ValidationStatus          = if (& $hasProp $config 'ValidationStatus') { & $getProp $config 'ValidationStatus' } else { $null }
+            ReconciliationStatus      = if (& $hasProp $config 'ReconciliationStatus') { & $getProp $config 'ReconciliationStatus' } else { $null }
+            SelectionReason           = if (& $hasProp $config 'SelectionReason') { & $getProp $config 'SelectionReason' } else { $null }
+            AddCount                  = if (& $hasProp $config 'AddCount') { & $getProp $config 'AddCount' } else { $null }
+            RemoveCount               = if (& $hasProp $config 'RemoveCount') { & $getProp $config 'RemoveCount' } else { $null }
+            UnchangedCount            = if (& $hasProp $config 'UnchangedCount') { & $getProp $config 'UnchangedCount' } else { $null }
+            UnmanagedMatchCount       = if (& $hasProp $config 'UnmanagedMatchCount') { & $getProp $config 'UnmanagedMatchCount' } else { $null }
         }
     })
 
@@ -115,8 +115,8 @@ function Write-PreventKitRunLog {
         Exceptions               = @($ExceptionKey)
         GlobalExceptions         = @($GlobalExceptionKey)
         SourceFingerprints       = @($fingerprints)
-        TargetOutcomes      = @($TargetOutcomes)
-        TargetConfigurations = @($targetConfigs)
+        TargetOutcomes           = @($TargetOutcomes)
+        TargetConfigurations     = @($targetConfigs)
         Status                   = $effectiveStatus
         ErrorMessage             = if ([string]::IsNullOrWhiteSpace($ErrorMessage)) { $null } else { $ErrorMessage }
     }

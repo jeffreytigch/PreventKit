@@ -223,7 +223,7 @@ function Invoke-PreventKitRun {
         if ($TablAuto) {
             $tablConfig = Get-AutoTablConfiguration
             $targetConfigurations += @{
-                Target         = 'Tabl'
+                Target              = 'Tabl'
                 ConfigurationMode   = 'Auto'
                 Capacity            = $tablConfig.Capacity
                 Status              = 'Selected'
@@ -240,7 +240,7 @@ function Invoke-PreventKitRun {
                 ConfigurationMode = 'Manual'
             }
             $targetConfigurations += @{
-                Target         = 'Tabl'
+                Target              = 'Tabl'
                 ConfigurationMode   = 'Manual'
                 Capacity            = $effectiveCapacity
                 Status              = 'Selected'
@@ -250,7 +250,7 @@ function Invoke-PreventKitRun {
         }
         else {
             $targetConfigurations += @{
-                Target         = 'Tabl'
+                Target              = 'Tabl'
                 ConfigurationMode   = 'None'
                 Capacity            = $null
                 Status              = 'Skipped'
@@ -264,7 +264,7 @@ function Invoke-PreventKitRun {
         if ($CniAuto) {
             $cniConfig = Get-AutoCniConfiguration
             $targetConfigurations += @{
-                Target         = 'Cni'
+                Target              = 'Cni'
                 ConfigurationMode   = 'Auto'
                 Capacity            = $cniConfig.Capacity
                 Status              = 'Selected'
@@ -284,7 +284,7 @@ function Invoke-PreventKitRun {
                 ConfigurationMode      = 'Manual'
             }
             $targetConfigurations += @{
-                Target         = 'Cni'
+                Target              = 'Cni'
                 ConfigurationMode   = 'Manual'
                 Capacity            = $CniCapacity
                 Status              = 'Selected'
@@ -294,7 +294,7 @@ function Invoke-PreventKitRun {
         }
         else {
             $targetConfigurations += @{
-                Target         = 'Cni'
+                Target              = 'Cni'
                 ConfigurationMode   = 'None'
                 Capacity            = $null
                 Status              = 'Skipped'

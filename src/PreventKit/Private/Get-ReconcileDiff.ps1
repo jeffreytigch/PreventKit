@@ -73,6 +73,6 @@ function Get-ReconcileDiff {
         AddCount                = @($adds).Count
         RemoveCount             = @($removes).Count
         UnchangedCount          = @($unchanged).Count
-        UnmanagedMatchCount = @($unmanaged).Count
+        UnmanagedMatchCount     = @($unmanaged).Count
     }
 }

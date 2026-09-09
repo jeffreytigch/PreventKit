@@ -184,13 +184,13 @@ Describe 'PreventKit scheduled Run log entry' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         InModuleScope PreventKit -Parameters @{ logDir = $logDir } {
             $abortedOutcome = [pscustomobject]@{
-                Target             = 'Tabl'
-                Status                  = 'Aborted'
-                Preflight               = [pscustomobject]@{ Passed = $false; PlannedCount = 4; Capacity = 1 }
-                AddCount                = 4
-                RemoveCount             = 0
-                UnchangedCount          = 0
-                UnmanagedMatchCount = 0
+                Target                = 'Tabl'
+                Status                = 'Aborted'
+                Preflight             = [pscustomobject]@{ Passed = $false; PlannedCount = 4; Capacity = 1 }
+                AddCount              = 4
+                RemoveCount           = 0
+                UnchangedCount        = 0
+                UnmanagedMatchCount   = 0
             }
 
             $written = Write-PreventKitRunLog -LogDirectory $logDir -Snapshots @() -TargetOutcomes @($abortedOutcome)
@@ -205,13 +205,13 @@ Describe 'PreventKit scheduled Run log entry' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         InModuleScope PreventKit -Parameters @{ logDir = $logDir } {
             $abortedOutcome = [pscustomobject]@{
-                Target             = 'Cni'
-                Status                  = 'Aborted'
-                Preflight               = [pscustomobject]@{ Passed = $false; PlannedCount = 9; Capacity = 1 }
-                AddCount                = 9
-                RemoveCount             = 0
-                UnchangedCount          = 0
-                UnmanagedMatchCount = 0
+                Target                = 'Cni'
+                Status                = 'Aborted'
+                Preflight             = [pscustomobject]@{ Passed = $false; PlannedCount = 9; Capacity = 1 }
+                AddCount              = 9
+                RemoveCount           = 0
+                UnchangedCount        = 0
+                UnmanagedMatchCount   = 0
             }
 
             $written = Write-PreventKitRunLog -LogDirectory $logDir -Snapshots @() `
