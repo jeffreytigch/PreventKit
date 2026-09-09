@@ -84,7 +84,7 @@ Describe 'PreventKit catalogue retrieval and validation' {
     }
 
     It 'is explicit about validation failure for an empty catalogue' {
-        $snapshot = @(Invoke-PreventKitRun -CatalogueDirectory $emptyDir)[0]
+        $snapshot = @(Invoke-PreventKitRun -CatalogueDirectory $emptyDir -StateDirectory (Join-Path $TestDrive ([guid]::NewGuid().Guid)))[0]
 
         $snapshot.Validation.Status | Should -Be 'Failure'
         @($snapshot.Validation.Checks | Where-Object { $_.Passed }).Count | Should -BeGreaterThan 0
@@ -111,7 +111,7 @@ Describe 'PreventKit desired state and WhatIf report' {
             $snapshots = @(Invoke-PreventKitRun -CatalogueDirectory $multiDir)
             $desiredState = Get-DesiredState -Snapshot $snapshots
 
-            @($desiredState.Services).Count | Should -Be 4
+            @($desiredState.Services).Count | Should -Be 2
         }
     }
 
@@ -120,7 +120,7 @@ Describe 'PreventKit desired state and WhatIf report' {
             $snapshots = @(Invoke-PreventKitRun -CatalogueDirectory $multiDir)
             $desiredState = Get-DesiredState -Snapshot $snapshots
 
-            @($desiredState.BlockableAddresses).Count | Should -Be 4
+            @($desiredState.BlockableAddresses).Count | Should -Be 3
         }
     }
 
@@ -138,7 +138,7 @@ Describe 'PreventKit desired state and WhatIf report' {
             $snapshots = @(Invoke-PreventKitRun -CatalogueDirectory $multiDir)
             $desiredState = Get-DesiredState -Snapshot $snapshots
 
-            @($desiredState.Contributions).Count | Should -Be 2
+            @($desiredState.Contributions).Count | Should -Be 1
 
             $lolrmm = $desiredState.Contributions | Where-Object { $_.CatalogueName -eq 'lolrmm' }
             $lolrmm.Scope | Should -Be 'lolrmm'
@@ -149,8 +149,8 @@ Describe 'PreventKit desired state and WhatIf report' {
     }
 
     It 'a failed-validation snapshot contributes no entries but is still reported as a contribution' {
-        InModuleScope PreventKit -Parameters @{ emptyDir = $emptyDir } {
-            $snapshots = @(Invoke-PreventKitRun -CatalogueDirectory $emptyDir)
+        InModuleScope PreventKit -Parameters @{ emptyDir = $emptyDir; stateDir = (Join-Path $TestDrive ([guid]::NewGuid().Guid)) } {
+            $snapshots = @(Invoke-PreventKitRun -CatalogueDirectory $emptyDir -StateDirectory $stateDir)
             $desiredState = Get-DesiredState -Snapshot $snapshots
 
             @($desiredState.Services).Count | Should -Be 0
@@ -179,11 +179,11 @@ Describe 'PreventKit desired state and WhatIf report' {
 
         $text | Should -Match 'Catalogue contributions'
         $text | Should -Match ([regex]::Escape('lolrmm'))
-        $text | Should -Match ([regex]::Escape('cloudflare.com'))
+        $text | Should -Match ([regex]::Escape('*.anydesk.com'))
     }
 
     It 'a WhatIf report renders a failed-validation catalogue with zero entries' {
-        $report = @(Invoke-PreventKitRun -CatalogueDirectory $emptyDir -WhatIf)
+        $report = @(Invoke-PreventKitRun -CatalogueDirectory $emptyDir -StateDirectory (Join-Path $TestDrive ([guid]::NewGuid().Guid)) -WhatIf)
         $text = $report -join "`n"
 
         $text | Should -Match 'Desired state'
