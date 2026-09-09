@@ -7,8 +7,8 @@ entries.
 Takes the raw TABL URL block entries that the caller supplies (as returned by
 Get-TenantAllowBlockListItems -ListType URL -Block), normalizes and classifies
 them with Read-TablBlockEntry, and builds the shared classification report of
-managed entries and unmanaged collisions. A managed entry carries the PreventKit
-provenance namespace in its Notes field; an unmanaged collision does not and is
+managed entries and unmanaged matches. A managed entry carries the PreventKit
+owner marker in its Notes field; an unmanaged match does not and is
 administrator-owned. This function only reads and reports; it never writes to
 any entry.
 
@@ -18,7 +18,7 @@ ListType and Action.
 
 .OUTPUTS
 System.Management.Automation.PSCustomObject with Entries, TotalCount,
-ManagedCount and UnmanagedCollisionCount properties.
+ManagedCount and UnmanagedMatchCount properties.
 #>
 function Get-TablBlockReport {
     [CmdletBinding()]

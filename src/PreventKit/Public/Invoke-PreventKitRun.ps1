@@ -11,19 +11,19 @@ produce a catalogue snapshot carrying a source fingerprint. Snapshots that pass
 validation are persisted as last known good snapshots under StateDirectory; on
 retrieval or validation failure the Run falls back to them (or records the
 failure) and still completes. Invocation exceptions supplied through
-ExceptionKey are non-overriding: matched services and blockable addresses drop
+ExceptionKey are managed-only: matched services and blockable addresses drop
 out of the desired state.
 
-When destination capacities are supplied (TablCapacity / CniCapacity), the Run
-also reconciles those enforcement destinations to the desired state and records
+When target capacities are supplied (TablCapacity / CniCapacity), the Run
+also reconciles those enforcement targets to the desired state and records
 the reconciliation outcomes. When LogDirectory is supplied, each Run writes a
 durable run log entry capturing source fingerprints, exceptions applied, and
-per-destination outcomes.
+per-target outcomes.
 
 With -WhatIf the run computes the desired state (after exceptions) and prints a
 readable WhatIf run report showing the desired state, what was suppressed, and
 each catalogue contribution, still without modifying any enforcement
-destination.
+target.
 
 .PARAMETER CatalogueDirectory
 Path to the version-controlled directory of catalogue declarations
@@ -31,7 +31,7 @@ Path to the version-controlled directory of catalogue declarations
 
 .PARAMETER ExceptionKey
 Invocation exception keys (e.g. 'service:lolrmm/AnyDesk', 'domain:anydesk.com').
-Non-overriding: matched entries leave the desired state and are not enforced.
+Managed-only: matched entries leave the desired state and are not enforced.
 
 .PARAMETER ExceptionDirectory
 Path to the version-controlled directory of global exception declarations
@@ -69,13 +69,13 @@ Raw current CNI indicators (as returned by the read side). Ignored when
 -CniAuto is specified.
 
 .PARAMETER TablAuto
-When specified, automatically configure the TABL destination: use the default
+When specified, automatically configure the TABL target: use the default
 Defender for Office 365 Plan 1 capacity (5000), verify an active Exchange
 Online session, and read current URL block entries from the tenant. No manual
 TablCapacity or TablCurrentEntries required.
 
 .PARAMETER CniAuto
-When specified, automatically configure the CNI destination: acquire the
+When specified, automatically configure the CNI target: acquire the
 Defender token from the signed-in Azure CLI session, verify the caller can
 read and write CNI, and read the current indicator state from the MDE API.
 No manual CniToken or CniCurrentEntries required.
@@ -84,9 +84,9 @@ No manual CniToken or CniCurrentEntries required.
 When specified with -TablCapacity (without -TablAuto), use the Defender for
 Office 365 Plan 1 default capacity (5000) instead of the supplied value.
 
-.PARAMETER DestinationOutcome
-Output variable to receive per-destination configuration and reconciliation
-outcomes. Each entry contains Destination, ConfigurationMode, Status, and
+.PARAMETER TargetOutcome
+Output variable to receive per-target configuration and reconciliation
+outcomes. Each entry contains Target, ConfigurationMode, Status, and
 details about what was selected, validated, reconciled, skipped, or unavailable.
 
 .EXAMPLE
@@ -158,8 +158,8 @@ function Invoke-PreventKitRun {
         [switch]$TablCapacityP1,
 
         [Parameter()]
-        [Alias('DestinationOutcome')]
-        [string]$DestinationOutcomeVariable
+        [Alias('TargetOutcome')]
+        [string]$TargetOutcomeVariable
     )
 
     $startedAt = [datetime]::UtcNow
@@ -169,8 +169,8 @@ function Invoke-PreventKitRun {
 
     $globalExceptionKey   = @()
     $snapshots            = @()
-    $destinationOutcomes  = @()
-    $destinationConfigurations = @()
+    $targetOutcomes  = @()
+    $targetConfigurations = @()
 
     try {
         foreach ($key in @($ExceptionKey)) {
@@ -209,7 +209,7 @@ function Invoke-PreventKitRun {
                     $null = Write-PreventKitRunLog -LogDirectory $LogDirectory -RunId $runId -StartedAt $startedAt `
                         -CatalogueDirectory $CatalogueDirectory -ExceptionKey $ExceptionKey `
                         -GlobalExceptionKey $globalExceptionKey `
-                        -Snapshots $snapshots -DestinationOutcomes @()
+                        -Snapshots $snapshots -TargetOutcomes @()
                 }
                 finally {
                     $WhatIfPreference = $previousWhatIfPreference
@@ -222,8 +222,8 @@ function Invoke-PreventKitRun {
         $tablConfig = $null
         if ($TablAuto) {
             $tablConfig = Get-AutoTablConfiguration
-            $destinationConfigurations += @{
-                Destination         = 'Tabl'
+            $targetConfigurations += @{
+                Target         = 'Tabl'
                 ConfigurationMode   = 'Auto'
                 Capacity            = $tablConfig.Capacity
                 Status              = 'Selected'
@@ -239,8 +239,8 @@ function Invoke-PreventKitRun {
                 SessionVerified  = $false
                 ConfigurationMode = 'Manual'
             }
-            $destinationConfigurations += @{
-                Destination         = 'Tabl'
+            $targetConfigurations += @{
+                Target         = 'Tabl'
                 ConfigurationMode   = 'Manual'
                 Capacity            = $effectiveCapacity
                 Status              = 'Selected'
@@ -249,8 +249,8 @@ function Invoke-PreventKitRun {
             }
         }
         else {
-            $destinationConfigurations += @{
-                Destination         = 'Tabl'
+            $targetConfigurations += @{
+                Target         = 'Tabl'
                 ConfigurationMode   = 'None'
                 Capacity            = $null
                 Status              = 'Skipped'
@@ -263,8 +263,8 @@ function Invoke-PreventKitRun {
         $cniConfig = $null
         if ($CniAuto) {
             $cniConfig = Get-AutoCniConfiguration
-            $destinationConfigurations += @{
-                Destination         = 'Cni'
+            $targetConfigurations += @{
+                Target         = 'Cni'
                 ConfigurationMode   = 'Auto'
                 Capacity            = $cniConfig.Capacity
                 Status              = 'Selected'
@@ -283,8 +283,8 @@ function Invoke-PreventKitRun {
                 AuthorizationVerified  = $false
                 ConfigurationMode      = 'Manual'
             }
-            $destinationConfigurations += @{
-                Destination         = 'Cni'
+            $targetConfigurations += @{
+                Target         = 'Cni'
                 ConfigurationMode   = 'Manual'
                 Capacity            = $CniCapacity
                 Status              = 'Selected'
@@ -293,8 +293,8 @@ function Invoke-PreventKitRun {
             }
         }
         else {
-            $destinationConfigurations += @{
-                Destination         = 'Cni'
+            $targetConfigurations += @{
+                Target         = 'Cni'
                 ConfigurationMode   = 'None'
                 Capacity            = $null
                 Status              = 'Skipped'
@@ -311,8 +311,8 @@ function Invoke-PreventKitRun {
             $result = Invoke-TablReconciliation -DesiredEntries @($desiredState.BlockableAddresses) `
                 -CurrentEntries $currentEntries -Capacity $capacity
 
-            # Update destination configuration with reconciliation outcome
-            $config = $destinationConfigurations | Where-Object { $_.Destination -eq 'Tabl' }
+            # Update target configuration with reconciliation outcome
+            $config = $targetConfigurations | Where-Object { $_.Target -eq 'Tabl' }
             if ($config) {
                 $preflightPassed = if ($result.PSObject.Properties['Preflight']) { $result.Preflight.Passed } else { $true }
                 $config.ValidationStatus = if ($preflightPassed) { 'Validated' } else { 'PreflightFailed' }
@@ -320,10 +320,10 @@ function Invoke-PreventKitRun {
                 $config.AddCount = if ($result.PSObject.Properties['AddCount']) { $result.AddCount } else { $null }
                 $config.RemoveCount = if ($result.PSObject.Properties['RemoveCount']) { $result.RemoveCount } else { $null }
                 $config.UnchangedCount = if ($result.PSObject.Properties['UnchangedCount']) { $result.UnchangedCount } else { $null }
-                $config.UnmanagedCollisionCount = if ($result.PSObject.Properties['UnmanagedCollisionCount']) { $result.UnmanagedCollisionCount } else { $null }
+                $config.UnmanagedMatchCount = if ($result.PSObject.Properties['UnmanagedMatchCount']) { $result.UnmanagedMatchCount } else { $null }
             }
 
-            $destinationOutcomes += $result
+            $targetOutcomes += $result
         }
 
         # Execute CNI reconciliation if configured
@@ -332,12 +332,12 @@ function Invoke-PreventKitRun {
             $capacity = $cniConfig.Capacity
             $token = $cniConfig.Token
 
-            $cniProjections = Get-CniDesiredProjections -DesiredState $desiredState
-            $result = Invoke-CniReconciliation -DesiredEntries $cniProjections `
+            $cniMappings = Get-CniDesiredMappings -DesiredState $desiredState
+            $result = Invoke-CniReconciliation -DesiredEntries $cniMappings `
                 -CurrentEntries $currentEntries -Capacity $capacity -Token $token
 
-            # Update destination configuration with reconciliation outcome
-            $config = $destinationConfigurations | Where-Object { $_.Destination -eq 'Cni' }
+            # Update target configuration with reconciliation outcome
+            $config = $targetConfigurations | Where-Object { $_.Target -eq 'Cni' }
             if ($config) {
                 $preflightPassed = if ($result.PSObject.Properties['Preflight']) { $result.Preflight.Passed } else { $true }
                 $config.ValidationStatus = if ($preflightPassed) { 'Validated' } else { 'PreflightFailed' }
@@ -345,23 +345,23 @@ function Invoke-PreventKitRun {
                 $config.AddCount = if ($result.PSObject.Properties['AddCount']) { $result.AddCount } else { $null }
                 $config.RemoveCount = if ($result.PSObject.Properties['RemoveCount']) { $result.RemoveCount } else { $null }
                 $config.UnchangedCount = if ($result.PSObject.Properties['UnchangedCount']) { $result.UnchangedCount } else { $null }
-                $config.UnmanagedCollisionCount = if ($result.PSObject.Properties['UnmanagedCollisionCount']) { $result.UnmanagedCollisionCount } else { $null }
+                $config.UnmanagedMatchCount = if ($result.PSObject.Properties['UnmanagedMatchCount']) { $result.UnmanagedMatchCount } else { $null }
             }
 
-            $destinationOutcomes += $result
+            $targetOutcomes += $result
         }
 
-        # Output destination configurations if variable requested
-        if ($PSBoundParameters.ContainsKey('DestinationOutcomeVariable')) {
-            Set-Variable -Name $DestinationOutcomeVariable -Value $destinationConfigurations -Scope 1 -Force
+        # Output target configurations if variable requested
+        if ($PSBoundParameters.ContainsKey('TargetOutcomeVariable')) {
+            Set-Variable -Name $TargetOutcomeVariable -Value $targetConfigurations -Scope 1 -Force
         }
 
         if (-not [string]::IsNullOrWhiteSpace($LogDirectory)) {
             $null = Write-PreventKitRunLog -LogDirectory $LogDirectory -RunId $runId -StartedAt $startedAt `
                 -CatalogueDirectory $CatalogueDirectory -ExceptionKey $ExceptionKey `
                 -GlobalExceptionKey $globalExceptionKey `
-                -Snapshots $snapshots -DestinationOutcomes $destinationOutcomes `
-                -DestinationConfigurations $destinationConfigurations
+                -Snapshots $snapshots -TargetOutcomes $targetOutcomes `
+                -TargetConfigurations $targetConfigurations
             $script:preventKitRunLogEntryWritten = $true
         }
 
@@ -373,8 +373,8 @@ function Invoke-PreventKitRun {
                 $null = Write-PreventKitRunLog -LogDirectory $LogDirectory -RunId $runId -StartedAt $startedAt `
                     -CatalogueDirectory $CatalogueDirectory -ExceptionKey $ExceptionKey `
                     -GlobalExceptionKey $globalExceptionKey `
-                    -Snapshots $snapshots -DestinationOutcomes $destinationOutcomes `
-                    -DestinationConfigurations $destinationConfigurations `
+                    -Snapshots $snapshots -TargetOutcomes $targetOutcomes `
+                    -TargetConfigurations $targetConfigurations `
                     -Status 'Failed' -ErrorMessage $_.Exception.Message
                 $script:preventKitRunLogEntryWritten = $true
             }

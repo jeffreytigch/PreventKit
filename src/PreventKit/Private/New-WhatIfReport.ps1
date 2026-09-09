@@ -6,9 +6,9 @@ Render a human-readable WhatIf run report from the desired state.
 Produces a readable report listing the desired state as services and blockable
 addresses, what invocation exceptions and global exceptions suppressed, and a
 section per catalogue contribution showing what each enabled catalogue
-declaration contributed, including the addresses that were subsumed by a
+declaration contributed, including the addresses that were covered by a
 broader wildcard entry and the addresses that were skipped as unrepresentable.
-Nothing is written to any enforcement destination.
+Nothing is written to any enforcement target.
 
 .OUTPUTS
 System.String, one line per report line.
@@ -90,25 +90,25 @@ function New-WhatIfReport {
         $lines += Format-ReportList -Title 'Unrepresentable' -Items $cUnrepresentable -Indent 2 `
             -Format { param($entry) "  - $($entry.Value) ($($entry.Reason))" }
 
-        $cSubsumed = @()
-        $subsumedProperty = $contribution.PSObject.Properties['Subsumed']
-        if ($null -ne $subsumedProperty -and $null -ne $subsumedProperty.Value) {
-            $cSubsumed = @($subsumedProperty.Value)
+        $cCovered = @()
+        $coveredProperty = $contribution.PSObject.Properties['Covered']
+        if ($null -ne $coveredProperty -and $null -ne $coveredProperty.Value) {
+            $cCovered = @($coveredProperty.Value)
         }
-        $lines += Format-ReportList -Title 'Subsumed blockable addresses' -Items $cSubsumed -Indent 2 `
+        $lines += Format-ReportList -Title 'Covered blockable addresses' -Items $cCovered -Indent 2 `
             -Format { param($entry) "  - $($entry.Value)" }
 
-        $cniTable = Get-CniProjectionTable -Snapshot $contribution
-        if (@($cniTable.Projections).Count -gt 0 -or @($cniTable.Unprojectable).Count -gt 0) {
-            $lines += '  CNI projections:'
-            foreach ($projection in @($cniTable.Projections)) {
-                $expansionFlag = if ($projection.Expanded) { ' [expansion]' } else { '' }
-                $lines += "    - $($projection.Value) ($($projection.IndicatorType))$expansionFlag"
+        $cniTable = Get-CniMappingTable -Snapshot $contribution
+        if (@($cniTable.Mappings).Count -gt 0 -or @($cniTable.Unmappable).Count -gt 0) {
+            $lines += '  CNI mappings:'
+            foreach ($mapping in @($cniTable.Mappings)) {
+                $broadenedFlag = if ($mapping.Broadened) { ' [broadened]' } else { '' }
+                $lines += "    - $($mapping.Value) ($($mapping.IndicatorType))$broadenedFlag"
             }
-            foreach ($unprojectable in @($cniTable.Unprojectable)) {
-                $lines += "    - skipped: $($unprojectable.Value) ($($unprojectable.Reason))"
+            foreach ($unmappable in @($cniTable.Unmappable)) {
+                $lines += "    - skipped: $($unmappable.Value) ($($unmappable.Reason))"
             }
-            $lines += "  ExpansionCount: $($cniTable.ExpansionCount) | Unprojectable: $(@($cniTable.Unprojectable).Count)"
+            $lines += "  BroadeningCount: $($cniTable.BroadeningCount) | Unmappable: $(@($cniTable.Unmappable).Count)"
         }
 
         $lines += ''

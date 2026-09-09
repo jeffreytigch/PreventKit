@@ -6,7 +6,7 @@ Run PreventKit for a scheduled invocation, returning a process exit code.
 Wraps Invoke-PreventKitRun for unattended, scheduled execution. It invokes the
 same Run engine as a manual Run and forwards every Run parameter. A Run that
 completes without throwing returns exit code 0 with the engine's own run log
-entry: status Completed, or status Partial when a destination aborted (for
+entry: status Completed, or status Partial when a target aborted (for
 example a capacity preflight failure). A failing Run writes a run log entry
 with status Failed and the error message, then returns exit code 1 so a
 scheduler can observe the failure without a human present. When no LogDirectory
@@ -54,13 +54,13 @@ Raw current CNI indicators (as returned by the read side). Ignored when
 -CniAuto is specified.
 
 .PARAMETER TablAuto
-When specified, automatically configure the TABL destination: use the default
+When specified, automatically configure the TABL target: use the default
 Defender for Office 365 Plan 1 capacity (5000), verify an active Exchange
 Online session, and read current URL block entries from the tenant. No manual
 TablCapacity or TablCurrentEntries required.
 
 .PARAMETER CniAuto
-When specified, automatically configure the CNI destination: acquire the
+When specified, automatically configure the CNI target: acquire the
 Defender token from the signed-in Azure CLI session, verify the caller can
 read and write CNI, and read the current indicator state from the MDE API.
 No manual CniToken or CniCurrentEntries required.
@@ -161,7 +161,7 @@ function Start-PreventKitRun {
                 $null = Write-PreventKitRunLog -LogDirectory $LogDirectory `
                     -CatalogueDirectory $CatalogueDirectory `
                     -ExceptionKey $ExceptionKey -GlobalExceptionKey $globalExceptionKey `
-                    -Snapshots @() -DestinationOutcomes @() `
+                    -Snapshots @() -TargetOutcomes @() `
                     -Status 'Failed' -ErrorMessage $_.Exception.Message
             }
             catch {

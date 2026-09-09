@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
 Add URL block entries to the Tenant Allow/Block List as permanent managed
-entries carrying the provenance namespace.
+entries carrying the owner marker.
 
 .DESCRIPTION
 Thin seam over New-TenantAllowBlockListItems. Adds the given values as
-permanent (no-expiration) URL block entries with the provenance namespace in
+permanent (no-expiration) URL block entries with the owner marker in
 their Notes, so the read side can later classify them as PreventKit managed
 entries. This is the only TABL write path used by reconciliation; it is kept
 deliberately thin so the reconcile logic can be tested by mocking this seam.
@@ -14,7 +14,7 @@ deliberately thin so the reconcile logic can be tested by mocking this seam.
 The URL values to block.
 
 .PARAMETER Notes
-Provenance note to stamp on each entry.
+Owner marker note to stamp on each entry.
 #>
 function Add-TablManagedEntry {
     [CmdletBinding()]

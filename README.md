@@ -4,7 +4,7 @@ PreventKit manages blocking rules for frequently abused services in one Microsof
 
 ## How it works
 
-A **Run** retrieves each enabled **catalogue source**, parses it with a **source adapter** into the canonical **Service** and **Blockable Address** model, validates the result, and computes the **desired state** as the union of all valid catalogue entries. The desired state is then reconciled to the **enforcement destinations** that were supplied with a capacity: managed entries that are no longer desired are removed, and missing managed entries are added. Administrator-owned entries are never adopted or changed.
+A **Run** retrieves each enabled **catalogue source**, parses it with a **source adapter** into the canonical **Service** and **Blockable Address** model, validates the result, and computes the **desired state** as the union of all valid catalogue entries. The desired state is then reconciled to the **enforcement targets** that were supplied with a capacity: managed entries that are no longer desired are removed, and missing managed entries are added. Administrator-owned entries are never adopted or changed.
 
 Every Run is either a manual invocation or a scheduled invocation; both drive the same engine.
 
@@ -17,8 +17,8 @@ flowchart LR
     B --> C[Apply exceptions]
     C --> D[Compute desired state]
     D --> E[Apply entries from catalogue sources to M365 services]
-    Destination1([Tenant Allow/Block List]) -.- E
-    Destination2([Custom Network Indicators]) -.- E
+    Target1([Tenant Allow/Block List]) -.- E
+    Target2([Custom Network Indicators]) -.- E
     E --> F{Done}
 ```
 
@@ -35,7 +35,7 @@ A catalogue source that fails retrieval or validation is skipped in favour of it
 
 ## Exceptions
 
-Exceptions are non-overriding: matched entries leave the desired state and are never enforced. No allow rule is ever created.
+Exceptions are managed-only: matched entries leave the desired state and are never enforced. No allow rule is ever created.
 
 - **Global exceptions** are stored, version-controlled declarations in an exception directory (`*.exception.psd1`). Every enabled declaration contributes its exception keys to every Run. Removing or disabling a declaration restores enforcement on the next Run.
 - **Invocation exceptions** are supplied through the Run's parameters and remain effective only while supplied to every Run.
@@ -51,7 +51,7 @@ Import-Module ./src/PreventKit/PreventKit.psd1
 Invoke-PreventKitRun -CatalogueDirectory ./catalogues -StateDirectory ./state -LogDirectory ./logs
 ```
 
-A **WhatIf run** computes and reports the desired state without modifying any enforcement destination:
+A **WhatIf run** computes and reports the desired state without modifying any enforcement target:
 
 ```powershell
 Invoke-PreventKitRun -CatalogueDirectory ./catalogues -WhatIf
@@ -76,13 +76,13 @@ Invoke-PreventKitRun -CatalogueDirectory ./catalogues -CniCapacity 15000 -CniTok
 
 ## Capacity limits
 
-Enforcement destinations impose license-dependent entry limits. Choose the `-*Capacity` parameters to fit both the planned managed-entry count and your tenant's limits; the **capacity preflight** aborts a destination when the planned count would exceed the supplied capacity.
+Enforcement targets impose license-dependent entry limits. Choose the `-*Capacity` parameters to fit both the planned managed-entry count and your tenant's limits; the **capacity preflight** aborts a target when the planned count would exceed the supplied capacity.
 
-| Destination | License | Block entry limit |
+| Target | License | Block entry limit |
 | --- | --- | --- |
 | **CNI** — Custom Network Indicators | Defender for Endpoint | 15,000 indicators per tenant |
 
-| Destination | License | Block entry limit |
+| Target | License | Block entry limit |
 | --- | --- | --- |
 | **TABL** — Tenant Allow/Block List | M365 without Defender for Office 365 | 500 |
 | **TABL** — Tenant Allow/Block List | Defender for Office 365 Plan 1 (BP, E3) | 1,000 |
@@ -103,12 +103,12 @@ See the script's comment-based help for Windows Task Scheduler registration.
 
 ## Run log
 
-Each Run writes a durable entry to the log directory (`<run-id>.run.json`) capturing source fingerprints, exceptions applied, per-destination reconciliation outcomes, and the Run status. Query entries with `Get-PreventKitRunLog` and print a per-run report with `New-PreventKitRunReport`. A Run that throws during reconciliation is logged as `Failed` with its error message and any captured per-destination outcomes; a Run whose destination aborts (for example a capacity preflight failure) is logged as `Partial` while still recording the `Aborted` destination outcome.
+Each Run writes a durable entry to the log directory (`<run-id>.run.json`) capturing source fingerprints, exceptions applied, per-target reconciliation outcomes, and the Run status. Query entries with `Get-PreventKitRunLog` and print a per-run report with `New-PreventKitRunReport`. A Run that throws during reconciliation is logged as `Failed` with its error message and any captured per-target outcomes; a Run whose target aborts (for example a capacity preflight failure) is logged as `Partial` while still recording the `Aborted` target outcome.
 
 ## Module layout
 
 - `src/PreventKit/Public/` — the exported commands (`Invoke-PreventKitRun`, `Start-PreventKitRun`, `Get-PreventKitRunLog`, `New-PreventKitRunReport`).
-- `src/PreventKit/Private/` — the retrieval, parsing, validation, exception, projection, reconciliation, and run-log internals.
+- `src/PreventKit/Private/` — the retrieval, parsing, validation, exception, mapping, reconciliation, and run-log internals.
 - `catalogues/` — the version-controlled catalogue declarations.
 - `scheduled/` — the scheduled Run entry point.
 - `docs/authentication.md` — Microsoft Entra app registration and CNI token acquisition (interactive, client certificate, managed identity).

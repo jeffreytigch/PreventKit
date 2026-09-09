@@ -1,6 +1,6 @@
 # Authentication setup
 
-PreventKit reconciles two enforcement destinations, each with its own
+PreventKit reconciles two enforcement targets, each with its own
 authentication:
 
 - **Custom Network Indicators (CNI)** calls the Microsoft Defender for Endpoint
@@ -221,6 +221,6 @@ passes it as `-CniToken` to `Invoke-PreventKitRun`; the scheduled wrapper
 accepts the same `-CniToken` parameter. A Run that reconciles Custom Network
 Indicators without a token fails before any request is sent.
 
-For the Tenant Allow/Block List destination, authentication is separate:
+For the Tenant Allow/Block List target, authentication is separate:
 connect an Exchange Online session (`Connect-ExchangeOnline`) before the Run,
 then pass `-TablCapacity` as usual.

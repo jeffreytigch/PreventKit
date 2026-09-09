@@ -3,13 +3,13 @@ BeforeAll {
     Import-Module $modulePath -Force
 
     $fixtureRoot = Join-Path $PSScriptRoot 'fixtures'
-    $allowDir    = Join-Path $fixtureRoot 'projection' 'allow'
-    $denyDir     = Join-Path $fixtureRoot 'projection' 'deny'
+    $allowDir    = Join-Path $fixtureRoot 'mapping' 'allow'
+    $denyDir     = Join-Path $fixtureRoot 'mapping' 'deny'
 }
 
-Describe 'PreventKit CNI destination projection' {
+Describe 'PreventKit CNI target mapping' {
 
-    It 'projects a bare domain as a non-expanded DomainName indicator' {
+    It 'maps a bare domain as a non-broadened DomainName indicator' {
         InModuleScope PreventKit {
             $address = [pscustomobject]@{
                 Value     = 'example.com'
@@ -17,17 +17,17 @@ Describe 'PreventKit CNI destination projection' {
                 ServiceId = 'lolrmm/SomeTool'
             }
 
-            $projection = Get-CniProjection -Address $address
+            $mapping = Get-CniMapping -Address $address
 
-            $projection.Value | Should -Be 'example.com'
-            $projection.SourceValue | Should -Be 'example.com'
-            $projection.IndicatorType | Should -Be 'DomainName'
-            $projection.Expanded | Should -BeFalse
-            $projection.ServiceId | Should -Be 'lolrmm/SomeTool'
+            $mapping.Value | Should -Be 'example.com'
+            $mapping.SourceValue | Should -Be 'example.com'
+            $mapping.IndicatorType | Should -Be 'DomainName'
+            $mapping.Broadened | Should -BeFalse
+            $mapping.ServiceId | Should -Be 'lolrmm/SomeTool'
         }
     }
 
-    It 'projects a wildcard domain as an expanded DomainName indicator when approved' {
+    It 'maps a wildcard domain as a broadened DomainName indicator when approved' {
         InModuleScope PreventKit {
             $address = [pscustomobject]@{
                 Value     = '*.example.com'
@@ -35,16 +35,16 @@ Describe 'PreventKit CNI destination projection' {
                 ServiceId = 'lolrmm/SomeTool'
             }
 
-            $projection = Get-CniProjection -Address $address -AllowExpansion
+            $mapping = Get-CniMapping -Address $address -AllowBroadening
 
-            $projection.Value | Should -Be 'example.com'
-            $projection.SourceValue | Should -Be '*.example.com'
-            $projection.IndicatorType | Should -Be 'DomainName'
-            $projection.Expanded | Should -BeTrue
+            $mapping.Value | Should -Be 'example.com'
+            $mapping.SourceValue | Should -Be '*.example.com'
+            $mapping.IndicatorType | Should -Be 'DomainName'
+            $mapping.Broadened | Should -BeTrue
         }
     }
 
-    It 'returns nothing for a wildcard domain when expansion is not approved' {
+    It 'returns nothing for a wildcard domain when broadening is not approved' {
         InModuleScope PreventKit {
             $address = [pscustomobject]@{
                 Value     = '*.example.com'
@@ -52,13 +52,13 @@ Describe 'PreventKit CNI destination projection' {
                 ServiceId = 'lolrmm/SomeTool'
             }
 
-            $projection = Get-CniProjection -Address $address
+            $mapping = Get-CniMapping -Address $address
 
-            $projection | Should -BeNullOrEmpty
+            $mapping | Should -BeNullOrEmpty
         }
     }
 
-    It 'projects an IP address as an IpAddress indicator' {
+    It 'maps an IP address as an IpAddress indicator' {
         InModuleScope PreventKit {
             $address = [pscustomobject]@{
                 Value     = '136.243.104.235'
@@ -66,15 +66,15 @@ Describe 'PreventKit CNI destination projection' {
                 ServiceId = 'lolrmm/SomeTool'
             }
 
-            $projection = Get-CniProjection -Address $address
+            $mapping = Get-CniMapping -Address $address
 
-            $projection.Value | Should -Be '136.243.104.235'
-            $projection.IndicatorType | Should -Be 'IpAddress'
-            $projection.Expanded | Should -BeFalse
+            $mapping.Value | Should -Be '136.243.104.235'
+            $mapping.IndicatorType | Should -Be 'IpAddress'
+            $mapping.Broadened | Should -BeFalse
         }
     }
 
-    It 'projects a URL as a Url indicator' {
+    It 'maps a URL as a Url indicator' {
         InModuleScope PreventKit {
             $address = [pscustomobject]@{
                 Value     = 'https://tele.example.net'
@@ -82,11 +82,11 @@ Describe 'PreventKit CNI destination projection' {
                 ServiceId = 'lolrmm/SomeTool'
             }
 
-            $projection = Get-CniProjection -Address $address
+            $mapping = Get-CniMapping -Address $address
 
-            $projection.Value | Should -Be 'https://tele.example.net'
-            $projection.IndicatorType | Should -Be 'Url'
-            $projection.Expanded | Should -BeFalse
+            $mapping.Value | Should -Be 'https://tele.example.net'
+            $mapping.IndicatorType | Should -Be 'Url'
+            $mapping.Broadened | Should -BeFalse
         }
     }
 
@@ -98,16 +98,16 @@ Describe 'PreventKit CNI destination projection' {
                 ServiceId = 'lolrmm/SomeTool'
             }
 
-            $projection = Get-CniProjection -Address $address
+            $mapping = Get-CniMapping -Address $address
 
-            $projection | Should -BeNullOrEmpty
+            $mapping | Should -BeNullOrEmpty
         }
     }
 }
 
-Describe 'PreventKit CNI projection table and expansion approval' {
+Describe 'PreventKit CNI mapping table and broadening approval' {
 
-    It 'produces a projection table with expansions explicitly flagged and counted' {
+    It 'produces a mapping table with broadenings explicitly flagged and counted' {
         InModuleScope PreventKit {
             $snapshot = [pscustomobject]@{
                 Scope               = 'lolrmm'
@@ -117,21 +117,21 @@ Describe 'PreventKit CNI projection table and expansion approval' {
                     [pscustomobject]@{ Value = '136.243.104.235'; Type = 'IpAddress'; ServiceId = 'lolrmm/SomeTool' },
                     [pscustomobject]@{ Value = 'https://tele.example.net'; Type = 'Url'; ServiceId = 'lolrmm/SomeTool' }
                 )
-                DestinationSettings = @{ Cni = @{ AllowExpansion = $true } }
+                TargetSettings = @{ Cni = @{ AllowBroadening = $true } }
             }
 
-            $table = Get-CniProjectionTable -Snapshot $snapshot
+            $table = Get-CniMappingTable -Snapshot $snapshot
 
             $table.Scope | Should -Be 'lolrmm'
-            $table.AllowExpansion | Should -BeTrue
-            @($table.Projections).Count | Should -Be 4
-            $table.ExpansionCount | Should -Be 1
-            @($table.Projections | Where-Object { $_.Expanded }).Value | Should -Be 'anydesk.com'
-            @($table.Unprojectable).Count | Should -Be 0
+            $table.AllowBroadening | Should -BeTrue
+            @($table.Mappings).Count | Should -Be 4
+            $table.BroadeningCount | Should -Be 1
+            @($table.Mappings | Where-Object { $_.Broadened }).Value | Should -Be 'anydesk.com'
+            @($table.Unmappable).Count | Should -Be 0
         }
     }
 
-    It 'defaults to no expansion approval and records the wildcard as unprojectable when approval is absent' {
+    It 'defaults to no broadening approval and records the wildcard as unmappable when approval is absent' {
         InModuleScope PreventKit {
             $snapshot = [pscustomobject]@{
                 Scope              = 'lolrmm'
@@ -141,40 +141,40 @@ Describe 'PreventKit CNI projection table and expansion approval' {
                 )
             }
 
-            $table = Get-CniProjectionTable -Snapshot $snapshot
+            $table = Get-CniMappingTable -Snapshot $snapshot
 
-            $table.AllowExpansion | Should -BeFalse
-            $table.ExpansionCount | Should -Be 0
-            @($table.Projections).Count | Should -Be 1
-            @($table.Unprojectable).Count | Should -Be 1
-            $table.Unprojectable[0].Value | Should -Be '*.anydesk.com'
-            $table.Unprojectable[0].Reason | Should -Be 'Wildcard domain requires expansion approval'
+            $table.AllowBroadening | Should -BeFalse
+            $table.BroadeningCount | Should -Be 0
+            @($table.Mappings).Count | Should -Be 1
+            @($table.Unmappable).Count | Should -Be 1
+            $table.Unmappable[0].Value | Should -Be '*.anydesk.com'
+            $table.Unmappable[0].Reason | Should -Be 'Wildcard domain requires broadening approval'
         }
     }
 
-    It 'records an unknown type as unprojectable with a reason' {
+    It 'records an unknown type as unmappable with a reason' {
         InModuleScope PreventKit {
             $snapshot = [pscustomobject]@{
                 Scope               = 'lolrmm'
                 BlockableAddresses  = @(
                     [pscustomobject]@{ Value = 'something'; Type = 'Fancy'; ServiceId = 'lolrmm/SomeTool' }
                 )
-                DestinationSettings = @{}
+                TargetSettings = @{}
             }
 
-            $table = Get-CniProjectionTable -Snapshot $snapshot
+            $table = Get-CniMappingTable -Snapshot $snapshot
 
-            @($table.Projections).Count | Should -Be 0
-            @($table.Unprojectable).Count | Should -Be 1
-            $table.Unprojectable[0].Value | Should -Be 'something'
-            $table.Unprojectable[0].Reason | Should -Match 'Fancy'
+            @($table.Mappings).Count | Should -Be 0
+            @($table.Unmappable).Count | Should -Be 1
+            $table.Unmappable[0].Value | Should -Be 'something'
+            $table.Unmappable[0].Reason | Should -Match 'Fancy'
         }
     }
 }
 
 Describe 'PreventKit CNI entry classification' {
 
-    It 'normalizes raw entries and classifies by provenance in the description field' {
+    It 'normalizes raw entries and classifies by owner marker in the description field' {
         InModuleScope PreventKit {
             $entries = @(
                 [pscustomobject]@{
@@ -203,11 +203,11 @@ Describe 'PreventKit CNI entry classification' {
             $classified[0].Title | Should -Be 'Example'
             $classified[0].Description | Should -Be 'PreventKit managed entry'
             $classified[0].Classification | Should -Be 'Managed'
-            $classified[1].Classification | Should -Be 'UnmanagedCollision'
+            $classified[1].Classification | Should -Be 'UnmanagedMatch'
         }
     }
 
-    It 'produces a report with total, managed and unmanaged collision counts' {
+    It 'produces a report with total, managed and unmanaged match counts' {
         InModuleScope PreventKit {
             $entries = @(
                 [pscustomobject]@{ indicatorValue = 'a.com'; indicatorType = 'DomainName'; title = 'a'; description = 'PreventKit managed'; id = 1; action = 'Block' },
@@ -219,7 +219,7 @@ Describe 'PreventKit CNI entry classification' {
 
             $report.TotalCount | Should -Be 3
             $report.ManagedCount | Should -Be 2
-            $report.UnmanagedCollisionCount | Should -Be 1
+            $report.UnmanagedMatchCount | Should -Be 1
             @($report.Entries).Count | Should -Be 3
         }
     }
@@ -230,65 +230,65 @@ Describe 'PreventKit CNI entry classification' {
 
             $report.TotalCount | Should -Be 0
             $report.ManagedCount | Should -Be 0
-            $report.UnmanagedCollisionCount | Should -Be 0
+            $report.UnmanagedMatchCount | Should -Be 0
             @($report.Entries).Count | Should -Be 0
         }
     }
 }
 
-Describe 'PreventKit CNI full-run projection' {
+Describe 'PreventKit CNI full-run mapping' {
 
-    It 'projects each address per declaration scope with expansion approved' {
+    It 'maps each address per declaration scope with broadening approved' {
         InModuleScope PreventKit -Parameters @{ allowDir = $allowDir } {
             $snapshots = @(Invoke-PreventKitRun -CatalogueDirectory $allowDir)
 
             $snapshots.Count | Should -Be 1
-            $table = Get-CniProjectionTable -Snapshot $snapshots[0]
+            $table = Get-CniMappingTable -Snapshot $snapshots[0]
 
             $table.Scope | Should -Be 'lolrmm'
-            $table.AllowExpansion | Should -BeTrue
-            @($table.Projections).Count | Should -Be 4
-            $table.ExpansionCount | Should -Be 1
-            @($table.Unprojectable).Count | Should -Be 0
+            $table.AllowBroadening | Should -BeTrue
+            @($table.Mappings).Count | Should -Be 4
+            $table.BroadeningCount | Should -Be 1
+            @($table.Unmappable).Count | Should -Be 0
 
-            $expanded = $table.Projections | Where-Object { $_.Expanded }
-            $expanded.Value | Should -Be 'anydesk.com'
-            $expanded.IndicatorType | Should -Be 'DomainName'
+            $broadened = $table.Mappings | Where-Object { $_.Broadened }
+            $broadened.Value | Should -Be 'anydesk.com'
+            $broadened.IndicatorType | Should -Be 'DomainName'
         }
     }
 
-    It 'reports the CNI projection section with the expansion flagged in a WhatIf run' {
+    It 'reports the CNI mapping section with the broadening flagged in a WhatIf run' {
         $report = @(Invoke-PreventKitRun -CatalogueDirectory $allowDir -WhatIf)
         $text = $report -join "`n"
 
-        $text | Should -Match 'CNI projections'
-        $text | Should -Match ([regex]::Escape('- anydesk.com (DomainName) [expansion]'))
+        $text | Should -Match 'CNI mappings'
+        $text | Should -Match ([regex]::Escape('- anydesk.com (DomainName) [broadened]'))
         $text | Should -Match ([regex]::Escape('- example.com (DomainName)'))
         $text | Should -Match ([regex]::Escape('- 136.243.104.235 (IpAddress)'))
-        $text | Should -Match 'ExpansionCount: 1'
+        $text | Should -Match 'BroadeningCount: 1'
     }
 
-    It 'skips and logs the wildcard domain when expansion is not approved' {
+    It 'skips and logs the wildcard domain when broadening is not approved' {
         InModuleScope PreventKit -Parameters @{ denyDir = $denyDir } {
             $snapshots = @(Invoke-PreventKitRun -CatalogueDirectory $denyDir)
 
-            $table = Get-CniProjectionTable -Snapshot $snapshots[0]
+            $table = Get-CniMappingTable -Snapshot $snapshots[0]
 
-            $table.AllowExpansion | Should -BeFalse
-            $table.ExpansionCount | Should -Be 0
-            @($table.Projections).Count | Should -Be 3
-            @($table.Unprojectable).Count | Should -Be 1
-            $table.Unprojectable[0].Value | Should -Be '*.anydesk.com'
+            $table.AllowBroadening | Should -BeFalse
+            $table.BroadeningCount | Should -Be 0
+            @($table.Mappings).Count | Should -Be 3
+            @($table.Unmappable).Count | Should -Be 1
+            $table.Unmappable[0].Value | Should -Be '*.anydesk.com'
         }
     }
 
-    It 'a deny WhatIf run reports the skipped wildcard as unprojectable' {
+    It 'a deny WhatIf run reports the skipped wildcard as unmappable' {
         $report = @(Invoke-PreventKitRun -CatalogueDirectory $denyDir -WhatIf)
         $text = $report -join "`n"
 
-        $text | Should -Match 'CNI projections'
+        $text | Should -Match 'CNI mappings'
         $text | Should -Match ([regex]::Escape('skipped: *.anydesk.com'))
-        $text | Should -Match 'ExpansionCount: 0'
-        $text | Should -Match 'Unprojectable: 1'
+        $text | Should -Match 'BroadeningCount: 0'
+        $text | Should -Match 'Unmappable: 1'
     }
 }

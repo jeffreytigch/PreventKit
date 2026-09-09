@@ -12,7 +12,7 @@ BeforeAll {
 
 Describe 'PreventKit catalogue retrieval and validation' {
 
-    It 'produces a snapshot for an enabled lolrmm declaration without touching any enforcement destination' {
+    It 'produces a snapshot for an enabled lolrmm declaration without touching any enforcement target' {
         $snapshots = @(Invoke-PreventKitRun -CatalogueDirectory $cleanDir)
 
         $snapshots.Count | Should -Be 1
@@ -49,15 +49,15 @@ Describe 'PreventKit catalogue retrieval and validation' {
         $ip.ServiceId | Should -Be 'lolrmm/Ammyy Admin'
     }
 
-    It 'logs and counts entries the adapter cannot represent and records subsumed addresses separately' {
+    It 'logs and counts entries the adapter cannot represent and records covered addresses separately' {
         $snapshot = @(Invoke-PreventKitRun -CatalogueDirectory $dirtyDir)[0]
 
         $snapshot.Fingerprint.ParsedCounts.Unrepresentable | Should -Be 2
-        $snapshot.Fingerprint.ParsedCounts.Subsumed | Should -Be 1
+        $snapshot.Fingerprint.ParsedCounts.Covered | Should -Be 1
         $snapshot.Fingerprint.ParsedCounts.BlockableAddresses | Should -Be 4
 
-        $subsumedValues = @($snapshot.Subsumed | ForEach-Object { $_.Value })
-        $subsumedValues | Should -Contain 'relay-[a-f0-9]{8}.net.anydesk.com:443'
+        $coveredValues = @($snapshot.Covered | ForEach-Object { $_.Value })
+        $coveredValues | Should -Contain 'relay-[a-f0-9]{8}.net.anydesk.com:443'
 
         $unrepresentableValues = @($snapshot.Unrepresentable | ForEach-Object { $_.Value })
         $unrepresentableValues | Should -Not -Contain 'relay-[a-f0-9]{8}.net.anydesk.com:443'
@@ -97,7 +97,7 @@ Describe 'PreventKit catalogue retrieval and validation' {
         $snapshots.Count | Should -Be 0
     }
 
-    It 'does not export any enforcement destination functions' {
+    It 'does not export any enforcement target functions' {
         $exported = @(Get-Command -Module PreventKit | Select-Object -ExpandProperty Name)
         $exported | Should -Contain 'Invoke-PreventKitRun'
         $exported | Where-Object { $_ -match 'Tabl|Indicator|GetTenant|New-Tenant|Invoke-RestMethod|CustomNetwork' } | Should -BeNullOrEmpty
@@ -192,30 +192,30 @@ Describe 'PreventKit desired state and WhatIf report' {
         $text | Should -Match 'Validation: Failure'
     }
 
-    It 'a WhatIf report shows subsumed blockable addresses alongside unrepresentable per contribution' {
+    It 'a WhatIf report shows covered blockable addresses alongside unrepresentable per contribution' {
         $report = @(Invoke-PreventKitRun -CatalogueDirectory $dirtyDir -WhatIf)
         $text = $report -join "`n"
 
-        $text | Should -Match 'Subsumed blockable addresses \(1\):'
+        $text | Should -Match 'Covered blockable addresses \(1\):'
         $text | Should -Match ([regex]::Escape('relay-[a-f0-9]{8}.net.anydesk.com:443'))
         $text | Should -Match 'Unrepresentable \(2\):'
         $text | Should -Match ([regex]::Escape('upload_data.qq.com'))
         $text | Should -Match ([regex]::Escape('agents*-cloud.acronis.com'))
     }
 
-    It 'subsumed addresses never enter the desired state, CNI projections, or TABL entries' {
+    It 'covered addresses never enter the desired state, CNI mappings, or TABL entries' {
         InModuleScope PreventKit -Parameters @{ dirtyDir = $dirtyDir } {
             $snapshots = @(Invoke-PreventKitRun -CatalogueDirectory $dirtyDir)
             $desiredState = Get-DesiredState -Snapshot $snapshots
 
             @($desiredState.BlockableAddresses | Where-Object { $_.Value -eq 'relay-[a-f0-9]{8}.net.anydesk.com:443' }).Count | Should -Be 0
 
-            $cniProjections = @(Get-CniDesiredProjections -DesiredState $desiredState)
-            @($cniProjections | Where-Object { $_.Value -eq 'relay-[a-f0-9]{8}.net.anydesk.com:443' }).Count | Should -Be 0
+            $cniMappings = @(Get-CniDesiredMappings -DesiredState $desiredState)
+            @($cniMappings | Where-Object { $_.Value -eq 'relay-[a-f0-9]{8}.net.anydesk.com:443' }).Count | Should -Be 0
         }
     }
 
-    It 'a WhatIf run completes without modifying any enforcement destination' {
+    It 'a WhatIf run completes without modifying any enforcement target' {
         $report = @(Invoke-PreventKitRun -CatalogueDirectory $cleanDir -WhatIf)
 
         $report | Should -Not -BeNullOrEmpty

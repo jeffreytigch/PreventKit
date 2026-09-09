@@ -10,7 +10,7 @@ writes the Run outcome to the run log, and exits with 0 on success or 1 on
 failure so a scheduler can detect a failing Run without a human present.
 
 The catalogue directory, state directory, log directory, optional global
-exception directory, and destination capacities are supplied as parameters;
+exception directory, and target capacities are supplied as parameters;
 defaults point at the standard directories of a repository checkout.
 
 Registering with Windows Task Scheduler:

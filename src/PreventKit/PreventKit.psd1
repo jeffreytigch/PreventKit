@@ -14,7 +14,7 @@
     VariablesToExport    = @()
     AliasesToExport      = @()
     PrivateData          = @{
-        ProvenanceNamespace = 'PreventKit'
+        OwnerMarker = 'PreventKit'
         PSData = @{
             Tags                       = @('Security', 'Microsoft365', 'Catalogue')
             ReleaseNotes               = ''

@@ -21,11 +21,11 @@ Describe 'PreventKit run log' {
             @($entries[0].SourceFingerprints).Count | Should -Be 1
             $entries[0].SourceFingerprints[0].CatalogueName | Should -Be 'lolrmm'
             $entries[0].SourceFingerprints[0].ContentHash | Should -Match '^[0-9a-f]{64}$'
-            @($entries[0].DestinationOutcomes).Count | Should -Be 0
+            @($entries[0].TargetOutcomes).Count | Should -Be 0
         }
     }
 
-    It 'records reconciliation changes and their outcomes per destination' {
+    It 'records reconciliation changes and their outcomes per target' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         InModuleScope PreventKit -Parameters @{ logDir = $logDir; cleanDir = $cleanDir } {
             Mock Add-TablManagedEntry { return $Values }
@@ -39,9 +39,9 @@ Describe 'PreventKit run log' {
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 10 -TablCurrentEntries $currentTabl
 
             $entries = @(Get-PreventKitRunLog -LogDirectory $logDir)
-            $entries[0].DestinationOutcomes.Count | Should -Be 1
-            $outcome = $entries[0].DestinationOutcomes[0]
-            $outcome.Destination | Should -Be 'Tabl'
+            $entries[0].TargetOutcomes.Count | Should -Be 1
+            $outcome = $entries[0].TargetOutcomes[0]
+            $outcome.Target | Should -Be 'Tabl'
             $outcome.Status | Should -Be 'Reconciled'
             $outcome.AddCount | Should -Be 4
             $outcome.RemoveCount | Should -Be 1
@@ -79,19 +79,19 @@ Describe 'PreventKit run log' {
         }
     }
 
-    It 'the run log entry and per-run report reflect the subsumed count alongside unrepresentable' {
+    It 'the run log entry and per-run report reflect the covered count alongside unrepresentable' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         InModuleScope PreventKit -Parameters @{ logDir = $logDir; dirtyDir = $dirtyDir } {
             $null = Invoke-PreventKitRun -CatalogueDirectory $dirtyDir -LogDirectory $logDir
 
             $entry = @(Get-PreventKitRunLog -LogDirectory $logDir)[0]
-            $entry.SourceFingerprints[0].ParsedCounts.Subsumed | Should -Be 1
+            $entry.SourceFingerprints[0].ParsedCounts.Covered | Should -Be 1
             $entry.SourceFingerprints[0].ParsedCounts.Unrepresentable | Should -Be 2
 
             $report = @(New-PreventKitRunReport -LogEntry $entry)
             $text = $report -join "`n"
 
-            $text | Should -Match 'subsumed=1'
+            $text | Should -Match 'covered=1'
             $text | Should -Match 'unrepresentable=2'
         }
     }
@@ -108,7 +108,7 @@ Describe 'PreventKit run log' {
         }
     }
 
-    It 'a WhatIf run logs fingerprints and exceptions without destination outcomes' {
+    It 'a WhatIf run logs fingerprints and exceptions without target outcomes' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         InModuleScope PreventKit -Parameters @{ logDir = $logDir; cleanDir = $cleanDir } {
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -WhatIf -ExceptionKey @('domain:GetScreen.me')
@@ -117,7 +117,7 @@ Describe 'PreventKit run log' {
 
             $entries[0].Exceptions | Should -Contain 'domain:GetScreen.me'
             @($entries[0].SourceFingerprints).Count | Should -Be 1
-            @($entries[0].DestinationOutcomes).Count | Should -Be 0
+            @($entries[0].TargetOutcomes).Count | Should -Be 0
         }
     }
 
@@ -136,12 +136,12 @@ Describe 'PreventKit run log' {
             $entries.Count | Should -Be 1
             $entries[0].Status | Should -Be 'Failed'
             $entries[0].ErrorMessage | Should -Match 'CNI API unavailable'
-            @($entries[0].DestinationOutcomes).Count | Should -Be 1
-            $entries[0].DestinationOutcomes[0].Destination | Should -Be 'Tabl'
+            @($entries[0].TargetOutcomes).Count | Should -Be 1
+            $entries[0].TargetOutcomes[0].Target | Should -Be 'Tabl'
         }
     }
 
-    It 'a Run whose destination aborts on capacity preflight is logged as Partial with the Aborted outcome' {
+    It 'a Run whose target aborts on capacity preflight is logged as Partial with the Aborted outcome' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         InModuleScope PreventKit -Parameters @{ logDir = $logDir; cleanDir = $cleanDir } {
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 0
@@ -150,9 +150,9 @@ Describe 'PreventKit run log' {
 
             $entries.Count | Should -Be 1
             $entries[0].Status | Should -Be 'Partial'
-            @($entries[0].DestinationOutcomes).Count | Should -Be 1
-            $entries[0].DestinationOutcomes[0].Destination | Should -Be 'Tabl'
-            $entries[0].DestinationOutcomes[0].Status | Should -Be 'Aborted'
+            @($entries[0].TargetOutcomes).Count | Should -Be 1
+            $entries[0].TargetOutcomes[0].Target | Should -Be 'Tabl'
+            $entries[0].TargetOutcomes[0].Status | Should -Be 'Aborted'
         }
     }
 }

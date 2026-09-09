@@ -102,12 +102,12 @@ Describe 'PreventKit scheduled Run wrapper' {
             $entries.Count | Should -Be 1
             $entries[0].Status | Should -Be 'Failed'
             $entries[0].ErrorMessage | Should -Match 'CNI API unavailable'
-            @($entries[0].DestinationOutcomes).Count | Should -Be 1
-            $entries[0].DestinationOutcomes[0].Destination | Should -Be 'Tabl'
+            @($entries[0].TargetOutcomes).Count | Should -Be 1
+            $entries[0].TargetOutcomes[0].Target | Should -Be 'Tabl'
         }
     }
 
-    It 'a scheduled Run with an aborted destination is logged as Partial and exits zero' {
+    It 'a scheduled Run with an aborted target is logged as Partial and exits zero' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         InModuleScope PreventKit -Parameters @{ logDir = $logDir; cleanDir = $cleanDir } {
             $exitCode = Start-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 0
@@ -116,13 +116,13 @@ Describe 'PreventKit scheduled Run wrapper' {
             $entries = @(Get-PreventKitRunLog -LogDirectory $logDir)
             $entries.Count | Should -Be 1
             $entries[0].Status | Should -Be 'Partial'
-            @($entries[0].DestinationOutcomes).Count | Should -Be 1
-            $entries[0].DestinationOutcomes[0].Destination | Should -Be 'Tabl'
-            $entries[0].DestinationOutcomes[0].Status | Should -Be 'Aborted'
+            @($entries[0].TargetOutcomes).Count | Should -Be 1
+            $entries[0].TargetOutcomes[0].Target | Should -Be 'Tabl'
+            $entries[0].TargetOutcomes[0].Status | Should -Be 'Aborted'
         }
     }
 
-    It 'forwards destination capacities to the Run engine' {
+    It 'forwards target capacities to the Run engine' {
         InModuleScope PreventKit -Parameters @{ cleanDir = $cleanDir } {
             $script:received = $null
             Mock Invoke-PreventKitRun {
@@ -180,20 +180,20 @@ Describe 'PreventKit scheduled Run log entry' {
         }
     }
 
-    It 'derives a Partial run status when a destination outcome is Aborted' {
+    It 'derives a Partial run status when a target outcome is Aborted' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         InModuleScope PreventKit -Parameters @{ logDir = $logDir } {
             $abortedOutcome = [pscustomobject]@{
-                Destination             = 'Tabl'
+                Target             = 'Tabl'
                 Status                  = 'Aborted'
                 Preflight               = [pscustomobject]@{ Passed = $false; PlannedCount = 4; Capacity = 1 }
                 AddCount                = 4
                 RemoveCount             = 0
                 UnchangedCount          = 0
-                UnmanagedCollisionCount = 0
+                UnmanagedMatchCount = 0
             }
 
-            $written = Write-PreventKitRunLog -LogDirectory $logDir -Snapshots @() -DestinationOutcomes @($abortedOutcome)
+            $written = Write-PreventKitRunLog -LogDirectory $logDir -Snapshots @() -TargetOutcomes @($abortedOutcome)
 
             $written.Status | Should -Be 'Partial'
             $entry = Get-PreventKitRunLog -LogDirectory $logDir -RunId $written.RunId
@@ -205,17 +205,17 @@ Describe 'PreventKit scheduled Run log entry' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         InModuleScope PreventKit -Parameters @{ logDir = $logDir } {
             $abortedOutcome = [pscustomobject]@{
-                Destination             = 'Cni'
+                Target             = 'Cni'
                 Status                  = 'Aborted'
                 Preflight               = [pscustomobject]@{ Passed = $false; PlannedCount = 9; Capacity = 1 }
                 AddCount                = 9
                 RemoveCount             = 0
                 UnchangedCount          = 0
-                UnmanagedCollisionCount = 0
+                UnmanagedMatchCount = 0
             }
 
             $written = Write-PreventKitRunLog -LogDirectory $logDir -Snapshots @() `
-                -DestinationOutcomes @($abortedOutcome) -Status 'Failed' -ErrorMessage 'Boom'
+                -TargetOutcomes @($abortedOutcome) -Status 'Failed' -ErrorMessage 'Boom'
 
             $written.Status | Should -Be 'Failed'
             $written.ErrorMessage | Should -Be 'Boom'

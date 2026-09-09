@@ -1,26 +1,26 @@
 <#
 .SYNOPSIS
-Classify a catalogue's unrepresentable values that are subsumed by its
+Classify a catalogue's unrepresentable values that are covered by its
 representable wildcard domain entries.
 
 .DESCRIPTION
-A subsumed blockable address is an address the desired state would enforce
+A covered address is an address the desired state would enforce
 anyway through a broader already-enforced entry, so the catalogue does not
-need it. This pure, generic helper partitions Candidates into the subsumed
-subset: a candidate is subsumed when its normalized tail equals the root of an
+need it. This pure, generic helper partitions Candidates into the covered
+subset: a candidate is covered when its normalized tail equals the root of an
 existing wildcard domain entry or ends with that root at a label boundary
 ('*.example.com' covers every host under 'example.com', so 'foo.example.com'
-and 'example.com' are subsumed but 'badexample.com' is not). A candidate
+and 'example.com' are covered but 'badexample.com' is not). A candidate
 covered only by a narrower sibling entry (e.g. 'cloud.example.com' present,
-'*.example.com' absent) is not subsumed. Each candidate and each representable
+'*.example.com' absent) is not covered. Each candidate and each representable
 address is normalized first by stripping any http(s) scheme, port, and
-path/query, leaving the address tail. Subsumption is decided only against the
+path/query, leaving the address tail. Covering is decided only against the
 caller's own representable addresses, so it never crosses catalogue sources.
 
 .OUTPUTS
-The Candidates whose Value is subsumed, one object each.
+The Candidates whose Value is covered, one object each.
 #>
-function Get-SubsumedBlockableAddress {
+function Get-CoveredBlockableAddress {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
@@ -41,21 +41,21 @@ function Get-SubsumedBlockableAddress {
         }
     ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
-    $subsumed = @(
+    $covered = @(
         foreach ($candidate in @($Candidates)) {
             $tail = Get-NormalizedAddressTail -Value ([string]$candidate.Value)
-            $isSubsumed = $false
+            $isCovered = $false
             foreach ($root in $wildcardRoots) {
                 if ($tail -ieq $root -or $tail.EndsWith(".$root", [System.StringComparison]::OrdinalIgnoreCase)) {
-                    $isSubsumed = $true
+                    $isCovered = $true
                     break
                 }
             }
-            if ($isSubsumed) { $candidate }
+            if ($isCovered) { $candidate }
         }
     )
 
-    @($subsumed)
+    @($covered)
 }
 
 <#

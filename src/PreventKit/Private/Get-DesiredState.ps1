@@ -9,7 +9,7 @@ blockable addresses by address Value. A snapshot that failed validation
 contributes no entries but is still carried as a contribution so a report can
 show why. Each snapshot is its own catalogue contribution record.
 
-Non-overriding exceptions drop matching entries out of the desired state
+Managed-only exceptions drop matching entries out of the desired state
 entirely (services by 'service:<Id>' keys, blockable addresses by
 'domain:<Value>' keys or the service key of their service) and record them in
 the Suppressed collection so a report can show what was suppressed. Invocation

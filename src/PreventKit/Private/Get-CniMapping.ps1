@@ -1,28 +1,27 @@
 <#
 .SYNOPSIS
-Project a blockable address to its MDE Custom Network Indicator representation.
+Map a blockable address to its MDE Custom Network Indicator representation.
 
 .DESCRIPTION
-Computes the destination projection of a blockable address for the Custom
-Network Indicators enforcement destination. A projection is produced only when
-it is semantics-preserving or an explicitly approved controlled destination
-expansion. Bare domains project as non-expanded DomainName indicators; wildcard
-domains project as the expanded root domain only when expansion is approved;
-URLs and IP addresses project unchanged. Addresses with no safe projection are
-skipped and logged with a warning.
+Computes the target mapping of a blockable address for the Custom
+Network Indicators enforcement target. A mapping is produced only when
+it is exact or an explicitly approved broadening. Bare domains map as
+non-broadened DomainName indicators; wildcard domains map as the broadened root
+domain only when broadening is approved; URLs and IP addresses map unchanged.
+Addresses with no safe mapping are skipped and logged with a warning.
 
 .OUTPUTS
-System.Management.Automation.PSCustomObject when a safe projection exists,
+System.Management.Automation.PSCustomObject when a safe mapping exists,
 otherwise nothing.
 #>
-function Get-CniProjection {
+function Get-CniMapping {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
         [pscustomobject]$Address,
 
         [Parameter()]
-        [switch]$AllowExpansion
+        [switch]$AllowBroadening
     )
 
     $value = [string]$Address.Value
@@ -33,17 +32,17 @@ function Get-CniProjection {
     switch ($type) {
         'Domain' {
             if ($isWildcard) {
-                if ($AllowExpansion.IsPresent) {
+                if ($AllowBroadening.IsPresent) {
                     [pscustomobject]@{
                         Value         = $value.Substring(2)
                         SourceValue   = $value
                         IndicatorType = 'DomainName'
-                        Expanded      = $true
+                        Broadened     = $true
                         ServiceId     = $serviceId
                     }
                 }
                 else {
-                    Write-Warning "Skipping unprojectable blockable address for CNI: '$value' ($(Get-CniSkipReason -Value $value -Type $type))"
+                    Write-Warning "Skipping unmappable blockable address for CNI: '$value' ($(Get-CniSkipReason -Value $value -Type $type))"
                 }
             }
             else {
@@ -51,7 +50,7 @@ function Get-CniProjection {
                     Value         = $value
                     SourceValue   = $value
                     IndicatorType = 'DomainName'
-                    Expanded      = $false
+                    Broadened     = $false
                     ServiceId     = $serviceId
                 }
             }
@@ -61,7 +60,7 @@ function Get-CniProjection {
                 Value         = $value
                 SourceValue   = $value
                 IndicatorType = 'Url'
-                Expanded      = $false
+                Broadened     = $false
                 ServiceId     = $serviceId
             }
         }
@@ -70,12 +69,12 @@ function Get-CniProjection {
                 Value         = $value
                 SourceValue   = $value
                 IndicatorType = 'IpAddress'
-                Expanded      = $false
+                Broadened     = $false
                 ServiceId     = $serviceId
             }
         }
         default {
-            Write-Warning "Skipping unprojectable blockable address for CNI: '$value' ($(Get-CniSkipReason -Value $value -Type $type))"
+            Write-Warning "Skipping unmappable blockable address for CNI: '$value' ($(Get-CniSkipReason -Value $value -Type $type))"
         }
     }
 }

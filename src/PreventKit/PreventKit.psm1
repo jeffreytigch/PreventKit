@@ -1,9 +1,9 @@
 Set-StrictMode -Version Latest
 
 $manifest = Import-PowerShellDataFile -LiteralPath (Join-Path $PSScriptRoot 'PreventKit.psd1')
-$script:provenanceNamespace = [string]$manifest.PrivateData.ProvenanceNamespace
-if ([string]::IsNullOrWhiteSpace($script:provenanceNamespace)) {
-    throw 'PreventKit module manifest must declare a non-empty ProvenanceNamespace in PrivateData.'
+$script:ownerMarker = [string]$manifest.PrivateData.OwnerMarker
+if ([string]::IsNullOrWhiteSpace($script:ownerMarker)) {
+    throw 'PreventKit module manifest must declare a non-empty OwnerMarker in PrivateData.'
 }
 
 $privateFunctions = Get-ChildItem -Path (Join-Path $PSScriptRoot 'Private') -Filter '*.ps1' -File

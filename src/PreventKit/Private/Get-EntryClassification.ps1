@@ -1,15 +1,15 @@
 <#
 .SYNOPSIS
-Classify an enforcement destination entry as managed or an unmanaged collision.
+Classify an enforcement target entry as managed or an unmanaged match.
 
 .DESCRIPTION
-Returns 'Managed' when the named provenance field of the entry carries the
-provenance namespace, meaning PreventKit owns the entry. Returns
-'UnmanagedCollision' otherwise, meaning the entry is administrator-owned and
+Returns 'Managed' when the named owner-marker field of the entry carries the
+owner marker, meaning PreventKit owns the entry. Returns
+'UnmanagedMatch' otherwise, meaning the entry is administrator-owned and
 must never be adopted or changed.
 
 .OUTPUTS
-System.String, 'Managed' or 'UnmanagedCollision'.
+System.String, 'Managed' or 'UnmanagedMatch'.
 #>
 function Get-EntryClassification {
     [CmdletBinding()]
@@ -22,9 +22,9 @@ function Get-EntryClassification {
         [string]$Field
     )
 
-    if (Test-EntryProvenance -Entry $Entry -Field $Field) {
+    if (Test-OwnerMarker -Entry $Entry -Field $Field) {
         return 'Managed'
     }
 
-    'UnmanagedCollision'
+    'UnmanagedMatch'
 }

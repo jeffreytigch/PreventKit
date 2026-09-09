@@ -112,7 +112,7 @@ Describe 'PreventKit global exceptions in a full run' {
         $text | Should -Match 'Blockable addresses \(1\):'
     }
 
-    It 'global exceptions suppress at the TABL destination: no add for them, remove enforced managed entries' {
+    It 'global exceptions suppress at the TABL target: no add for them, remove enforced managed entries' {
         InModuleScope PreventKit -Parameters @{ cleanDir = $cleanDir; exceptionsDir = $exceptionsDir } {
             $currentTabl = @(
                 [pscustomobject]@{ Value = '*.anydesk.com'; Identity = '1'; Notes = 'PreventKit managed entry' },
@@ -138,21 +138,21 @@ Describe 'PreventKit global exceptions in a full run' {
         }
     }
 
-    It 'global exceptions suppress at the CNI destination' {
+    It 'global exceptions suppress at the CNI target' {
         InModuleScope PreventKit -Parameters @{ cleanDir = $cleanDir; exceptionsDir = $exceptionsDir } {
             $currentCni = @(
                 [pscustomobject]@{ indicatorValue = 'boot.net.anydesk.com'; indicatorType = 'DomainName'; description = 'PreventKit managed entry'; id = 'c1'; action = 'Block' },
                 [pscustomobject]@{ indicatorValue = 'server.absolute.com'; indicatorType = 'DomainName'; description = 'PreventKit managed entry'; id = 'c2'; action = 'Block' }
             )
 
-            Mock Add-CniManagedEntry { return $Projections }
+            Mock Add-CniManagedEntry { return $Mappings }
             Mock Remove-CniManagedEntry { }
 
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -ExceptionDirectory $exceptionsDir `
                 -CniCapacity 10 -CniCurrentEntries $currentCni -CniToken 'test-token'
 
             Assert-MockCalled Add-CniManagedEntry -Times 0 -Exactly -ParameterFilter {
-                @($Projections | Where-Object { $_.Value -match 'anydesk' }).Count -gt 0
+                @($Mappings | Where-Object { $_.Value -match 'anydesk' }).Count -gt 0
             }
             Assert-MockCalled Remove-CniManagedEntry -Times 1 -Exactly -ParameterFilter {
                 @($Id | Where-Object { $_ -eq 'c1' }).Count -gt 0

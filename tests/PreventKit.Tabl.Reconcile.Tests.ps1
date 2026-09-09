@@ -21,7 +21,7 @@ Describe 'PreventKit reconcile diff (TABL)' {
             $diff.Adds[0].Value | Should -Be 'evil.example.com'
             @($diff.Removes).Count | Should -Be 0
             @($diff.Unchanged).Count | Should -Be 1
-            $diff.UnmanagedCollisionCount | Should -Be 0
+            $diff.UnmanagedMatchCount | Should -Be 0
         }
     }
 
@@ -44,20 +44,20 @@ Describe 'PreventKit reconcile diff (TABL)' {
         }
     }
 
-    It 'never removes unmanaged collisions' {
+    It 'never removes unmanaged matches' {
         InModuleScope PreventKit {
             $desired = @(
                 [pscustomobject]@{ Value = 'evil.example.com'; Type = 'Domain'; ServiceId = 'lolrmm/Tool' }
             )
             $current = @(
                 [pscustomobject]@{ Value = 'evil.example.com'; Identity = '1'; Notes = 'PreventKit managed'; Classification = 'Managed' },
-                [pscustomobject]@{ Value = 'admin.example.org'; Identity = '2'; Notes = 'administrator note'; Classification = 'UnmanagedCollision' }
+                [pscustomobject]@{ Value = 'admin.example.org'; Identity = '2'; Notes = 'administrator note'; Classification = 'UnmanagedMatch' }
             )
 
             $diff = Get-ReconcileDiff -DesiredEntries $desired -CurrentEntries $current -CurrentValueProperty 'Value'
 
-            @($diff.Removes | Where-Object { $_.Classification -eq 'UnmanagedCollision' }).Count | Should -Be 0
-            $diff.UnmanagedCollisionCount | Should -Be 1
+            @($diff.Removes | Where-Object { $_.Classification -eq 'UnmanagedMatch' }).Count | Should -Be 0
+            $diff.UnmanagedMatchCount | Should -Be 1
         }
     }
 
@@ -68,7 +68,7 @@ Describe 'PreventKit reconcile diff (TABL)' {
             @($diff.Adds).Count | Should -Be 0
             @($diff.Removes).Count | Should -Be 0
             @($diff.Unchanged).Count | Should -Be 0
-            $diff.UnmanagedCollisionCount | Should -Be 0
+            $diff.UnmanagedMatchCount | Should -Be 0
         }
     }
 }
@@ -106,7 +106,7 @@ Describe 'PreventKit capacity preflight' {
 
 Describe 'PreventKit TABL reconciliation' {
 
-    It 'adds missing entries and removes stale managed entries, leaving unmanaged collisions alone' {
+    It 'adds missing entries and removes stale managed entries, leaving unmanaged matches alone' {
         InModuleScope PreventKit {
             $desired = @(
                 [pscustomobject]@{ Value = 'new.example.com'; Type = 'Domain'; ServiceId = 'lolrmm/Tool' },
@@ -132,7 +132,7 @@ Describe 'PreventKit TABL reconciliation' {
         }
     }
 
-    It 'adds missing entries in batches carrying the provenance namespace in Notes' {
+    It 'adds missing entries in batches carrying the owner marker in Notes' {
         InModuleScope PreventKit {
             $desired = @(
                 [pscustomobject]@{ Value = 'a.example.com'; Type = 'Domain'; ServiceId = 'lolrmm/Tool' },
@@ -146,7 +146,7 @@ Describe 'PreventKit TABL reconciliation' {
             $result = Invoke-TablReconciliation -DesiredEntries $desired -CurrentEntries @() -Capacity 10 -AddBatchSize 2
 
             Assert-MockCalled Add-TablManagedEntry -Times 2 -Exactly
-            Assert-MockCalled Add-TablManagedEntry -Times 2 -Exactly -ParameterFilter { $Notes -match $script:provenanceNamespace }
+            Assert-MockCalled Add-TablManagedEntry -Times 2 -Exactly -ParameterFilter { $Notes -match $script:ownerMarker }
         }
     }
 
@@ -168,7 +168,7 @@ Describe 'PreventKit TABL reconciliation' {
         }
     }
 
-    It 'a second run against the reconciled destination makes no changes' {
+    It 'a second run against the reconciled target makes no changes' {
         InModuleScope PreventKit {
             $desired = @(
                 [pscustomobject]@{ Value = 'evil.example.com'; Type = 'Domain'; ServiceId = 'lolrmm/Tool' }
@@ -191,7 +191,7 @@ Describe 'PreventKit TABL reconciliation' {
 
 Describe 'PreventKit TABL managed entry removal' {
 
-    It 'calls the destination cmdlet with its supported parameter set, never with -Block' {
+    It 'calls the target cmdlet with its supported parameter set, never with -Block' {
         InModuleScope PreventKit {
             function Remove-TenantAllowBlockListItems {
                 [CmdletBinding()]

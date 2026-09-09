@@ -1,16 +1,16 @@
 <#
 .SYNOPSIS
-Test whether a destination entry carries the PreventKit provenance namespace.
+Test whether a target entry carries the PreventKit owner marker.
 
 .DESCRIPTION
-Returns $true when the named field of an enforcement destination entry contains
-the provenance namespace, identifying the entry as a PreventKit managed entry.
+Returns $true when the named field of an enforcement target entry contains
+the owner marker, identifying the entry as a PreventKit managed entry.
 A missing, empty, or non-matching field returns $false.
 
 .OUTPUTS
 System.Boolean.
 #>
-function Test-EntryProvenance {
+function Test-OwnerMarker {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
@@ -31,5 +31,5 @@ function Test-EntryProvenance {
         return $false
     }
 
-    return $value.IndexOf($script:provenanceNamespace, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+    return $value.IndexOf($script:ownerMarker, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
 }

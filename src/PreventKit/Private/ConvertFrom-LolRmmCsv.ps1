@@ -8,13 +8,13 @@ The lolrmm catalogue source is a CSV with URI and RMM_Tool columns. Each row
 maps one blockable address (the URI) to a service (the tool). Addresses that
 are not a representable URL, domain, or IP address are checked against the
 catalogue's own representable wildcard entries: an address a wildcard entry
-already enforces is recorded as subsumed with no warning, while genuinely
+already enforces is recorded as covered with no warning, while genuinely
 unrepresentable addresses are logged and skipped. Every representable address
 is carried verbatim together with the service identity it represents.
 
 .OUTPUTS
 System.Management.Automation.PSCustomObject with Services, BlockableAddresses,
-Unrepresentable and Subsumed collections.
+Unrepresentable and Covered collections.
 #>
 function ConvertFrom-LolRmmCsv {
     [CmdletBinding()]
@@ -61,9 +61,9 @@ function ConvertFrom-LolRmmCsv {
         }
     }
 
-    $subsumed = @(Get-SubsumedBlockableAddress -RepresentableAddresses $blockableAddresses -Candidates $unrepresentable)
-    $subsumedValues = @($subsumed | ForEach-Object { [string]$_.Value })
-    $unrepresentable = @($unrepresentable | Where-Object { [string]$_.Value -notin $subsumedValues })
+    $covered = @(Get-CoveredBlockableAddress -RepresentableAddresses $blockableAddresses -Candidates $unrepresentable)
+    $coveredValues = @($covered | ForEach-Object { [string]$_.Value })
+    $unrepresentable = @($unrepresentable | Where-Object { [string]$_.Value -notin $coveredValues })
 
     foreach ($entry in $unrepresentable) {
         Write-Warning "Skipping unrepresentable blockable address: '$($entry.Value)'"
@@ -73,6 +73,6 @@ function ConvertFrom-LolRmmCsv {
         Services           = @($services.Values)
         BlockableAddresses = @($blockableAddresses)
         Unrepresentable    = @($unrepresentable)
-        Subsumed           = @($subsumed)
+        Covered            = @($covered)
     }
 }

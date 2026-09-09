@@ -7,7 +7,7 @@ Takes the raw TABL URL block entries that the caller supplies (as returned by
 Get-TenantAllowBlockListItems -ListType URL -Block) and emits one normalized
 entry object per input entry. Each normalized entry carries the blocked Value,
 Identity, Notes and a Classification computed from the Notes field, where the
-TABL provenance namespace lives. This is the read side of TABL reconciliation:
+TABL owner marker lives. This is the read side of TABL reconciliation:
 it never writes to, adopts, or changes any entry.
 
 .PARAMETER Entries

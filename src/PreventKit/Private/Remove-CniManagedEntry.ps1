@@ -7,7 +7,7 @@ Posts the given indicator ids to the BatchDelete endpoint in batches of at most
 BatchSize ids, paced to respect the API rate limit (RateLimitPerMinute calls per
 minute) with a Start-Sleep between batches. Each batch request goes through
 Invoke-CniApiRequest so 429 responses back off and retry. Callers are expected
-to pass only ids of managed indicators, never unmanaged collisions.
+to pass only ids of managed indicators, never unmanaged matches.
 
 .PARAMETER Id
 The ids of the managed indicators to remove.

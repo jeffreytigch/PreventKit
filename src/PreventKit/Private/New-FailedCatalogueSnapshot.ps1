@@ -30,9 +30,9 @@ function New-FailedCatalogueSnapshot {
         [string]$FailureReason
     )
 
-    $destinationSettings = @{}
-    if ($Declaration.ContainsKey('Destinations')) {
-        $destinationSettings = $Declaration.Destinations
+    $targetSettings = @{}
+    if ($Declaration.ContainsKey('Targets')) {
+        $targetSettings = $Declaration.Targets
     }
 
     [pscustomobject]@{
@@ -47,7 +47,7 @@ function New-FailedCatalogueSnapshot {
                 Services           = 0
                 BlockableAddresses = 0
                 Unrepresentable    = 0
-                Subsumed           = 0
+                Covered            = 0
             }
             UsedLastKnownGood = $false
             FailureReason     = $FailureReason
@@ -55,7 +55,7 @@ function New-FailedCatalogueSnapshot {
         Services           = @()
         BlockableAddresses = @()
         Unrepresentable    = @()
-        Subsumed           = @()
+        Covered            = @()
         Validation         = [pscustomobject]@{
             Status = 'Failure'
             Checks = @(
@@ -66,6 +66,6 @@ function New-FailedCatalogueSnapshot {
                 }
             )
         }
-        DestinationSettings = $destinationSettings
+        TargetSettings = $targetSettings
     }
 }

@@ -1,18 +1,18 @@
 <#
 .SYNOPSIS
-Reconcile MDE Custom Network Indicators to the projected desired state.
+Reconcile MDE Custom Network Indicators to the mapped desired state.
 
 .DESCRIPTION
-Runs a capacity preflight before any write, then brings the CNI destination in
-line with the desired entries. Missing projections are added as permanent
-managed indicators carrying the provenance namespace in their description,
+Runs a capacity preflight before any write, then brings the CNI target in
+line with the desired entries. Missing mappings are added as permanent
+managed indicators carrying the owner marker in their description,
 posted in batches paced to the API rate limit with 429 backoff; stale managed
-indicators are removed via BatchDelete; unmanaged collisions are never adopted,
+indicators are removed via BatchDelete; unmanaged matches are never adopted,
 changed, or removed. When the preflight fails, no write happens and the run
 reports Status 'Aborted'.
 
 .PARAMETER DesiredEntries
-Desired CNI projections. Each must expose Value, IndicatorType and ServiceId.
+Desired CNI mappings. Each must expose Value, IndicatorType and ServiceId.
 
 .PARAMETER CurrentEntries
 Raw current CNI indicators (as returned by the read side), each exposing
@@ -40,8 +40,8 @@ Maximum attempts per batch before giving up on persistent 429 responses.
 Base backoff seconds passed through to each request.
 
 .OUTPUTS
-System.Management.Automation.PSCustomObject with Destination, Status, Preflight,
-AddCount, RemoveCount, UnchangedCount and UnmanagedCollisionCount properties.
+System.Management.Automation.PSCustomObject with Target, Status, Preflight,
+AddCount, RemoveCount, UnchangedCount and UnmanagedMatchCount properties.
 #>
 function Invoke-CniReconciliation {
     [CmdletBinding()]
@@ -87,19 +87,19 @@ function Invoke-CniReconciliation {
         -AddCount $diff.AddCount -RemoveCount $diff.RemoveCount -Capacity $Capacity
 
     if (-not $preflight.Passed) {
-        return New-ReconcileResult -Destination 'Cni' -Status 'Aborted' -Preflight $preflight `
+        return New-ReconcileResult -Target 'Cni' -Status 'Aborted' -Preflight $preflight `
             -AddCount $diff.AddCount -RemoveCount $diff.RemoveCount `
-            -UnchangedCount $diff.UnchangedCount -UnmanagedCollisionCount $diff.UnmanagedCollisionCount
+            -UnchangedCount $diff.UnchangedCount -UnmanagedMatchCount $diff.UnmanagedMatchCount
     }
 
     if ($diff.AddCount -eq 0 -and $diff.RemoveCount -eq 0) {
-        return New-ReconcileResult -Destination 'Cni' -Status 'NoChanges' -Preflight $preflight `
+        return New-ReconcileResult -Target 'Cni' -Status 'NoChanges' -Preflight $preflight `
             -AddCount 0 -RemoveCount 0 `
-            -UnchangedCount $diff.UnchangedCount -UnmanagedCollisionCount $diff.UnmanagedCollisionCount
+            -UnchangedCount $diff.UnchangedCount -UnmanagedMatchCount $diff.UnmanagedMatchCount
     }
 
     if ($diff.AddCount -gt 0) {
-        $null = Add-CniManagedEntry -Projections $diff.Adds -BatchSize $BatchSize `
+        $null = Add-CniManagedEntry -Mappings $diff.Adds -BatchSize $BatchSize `
             -RateLimitPerMinute $RateLimitPerMinute -MaxRetries $MaxRetries `
             -BackoffSeconds $BackoffSeconds -Token $Token
     }
@@ -110,7 +110,7 @@ function Invoke-CniReconciliation {
             -MaxRetries $MaxRetries -BackoffSeconds $BackoffSeconds -Token $Token
     }
 
-    New-ReconcileResult -Destination 'Cni' -Status 'Reconciled' -Preflight $preflight `
+    New-ReconcileResult -Target 'Cni' -Status 'Reconciled' -Preflight $preflight `
         -AddCount $diff.AddCount -RemoveCount $diff.RemoveCount `
-        -UnchangedCount $diff.UnchangedCount -UnmanagedCollisionCount $diff.UnmanagedCollisionCount
+        -UnchangedCount $diff.UnchangedCount -UnmanagedMatchCount $diff.UnmanagedMatchCount
 }

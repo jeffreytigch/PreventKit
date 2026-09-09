@@ -3,18 +3,18 @@ BeforeAll {
     Import-Module $modulePath -Force
 }
 
-Describe 'PreventKit provenance namespace configuration' {
+Describe 'PreventKit owner marker configuration' {
 
-    It 'freezes the provenance namespace from module config at load' {
+    It 'freezes the owner marker from module config at load' {
         InModuleScope PreventKit -Parameters @{ modulePath = $modulePath } {
             $manifest = Import-PowerShellDataFile -LiteralPath $modulePath
-            $script:provenanceNamespace | Should -Be $manifest.PrivateData.ProvenanceNamespace
+            $script:ownerMarker | Should -Be $manifest.PrivateData.OwnerMarker
         }
     }
 
-    It 'classifies entries carrying the configured namespace as managed' {
+    It 'classifies entries carrying the configured owner marker as managed' {
         InModuleScope PreventKit {
-            $entry = [pscustomobject]@{ Value = 'evil.example.com'; Notes = "$($script:provenanceNamespace) managed entry" }
+            $entry = [pscustomobject]@{ Value = 'evil.example.com'; Notes = "$($script:ownerMarker) managed entry" }
 
             (Get-EntryClassification -Entry $entry -Field 'Notes') | Should -Be 'Managed'
         }
@@ -42,7 +42,7 @@ Describe 'PreventKit TABL block entry read and classification' {
             }
         }
 
-        It 'classifies an entry carrying the provenance namespace in Notes as Managed' {
+        It 'classifies an entry carrying the owner marker in Notes as Managed' {
             InModuleScope PreventKit {
                 $entry = [pscustomobject]@{ Value = 'evil.example.com'; Identity = '1'; Notes = 'PreventKit managed entry' }
 
@@ -52,25 +52,25 @@ Describe 'PreventKit TABL block entry read and classification' {
             }
         }
 
-        It 'classifies an entry without the provenance namespace as UnmanagedCollision' {
+        It 'classifies an entry without the owner marker as UnmanagedMatch' {
             InModuleScope PreventKit {
                 $entry = [pscustomobject]@{ Value = 'bad.example.net'; Identity = '2'; Notes = 'administrator note' }
 
                 $normalized = @(Read-TablBlockEntry -Entries $entry)
 
-                $normalized[0].Classification | Should -Be 'UnmanagedCollision'
+                $normalized[0].Classification | Should -Be 'UnmanagedMatch'
             }
         }
 
-        It 'classifies entries with empty or missing Notes as UnmanagedCollision' {
+        It 'classifies entries with empty or missing Notes as UnmanagedMatch' {
             InModuleScope PreventKit {
                 $emptyNotes  = [pscustomobject]@{ Value = 'a.example.org'; Identity = '3'; Notes = '' }
                 $missingNotes = [pscustomobject]@{ Value = 'b.example.org'; Identity = '4' }
 
                 $normalized = @(Read-TablBlockEntry -Entries @($emptyNotes, $missingNotes))
 
-                $normalized[0].Classification | Should -Be 'UnmanagedCollision'
-                $normalized[1].Classification | Should -Be 'UnmanagedCollision'
+                $normalized[0].Classification | Should -Be 'UnmanagedMatch'
+                $normalized[1].Classification | Should -Be 'UnmanagedMatch'
                 $normalized[1].Notes | Should -BeNullOrEmpty
             }
         }
@@ -78,7 +78,7 @@ Describe 'PreventKit TABL block entry read and classification' {
 
     Context 'Get-TablBlockReport' {
 
-        It 'reports correct counts of managed entries and unmanaged collisions' {
+        It 'reports correct counts of managed entries and unmanaged matches' {
             InModuleScope PreventKit {
                 $entries = @(
                     [pscustomobject]@{ Value = 'evil.example.com'; Identity = '1'; Notes = 'PreventKit managed entry' }
@@ -90,7 +90,7 @@ Describe 'PreventKit TABL block entry read and classification' {
 
                 $report.TotalCount | Should -Be 3
                 $report.ManagedCount | Should -Be 2
-                $report.UnmanagedCollisionCount | Should -Be 1
+                $report.UnmanagedMatchCount | Should -Be 1
                 @($report.Entries).Count | Should -Be 3
             }
         }
@@ -105,7 +105,7 @@ Describe 'PreventKit TABL block entry read and classification' {
                 $report = Get-TablBlockReport -Entries $entries
 
                 @($report.Entries | Where-Object { $_.Classification -eq 'Managed' }).Count | Should -Be 1
-                @($report.Entries | Where-Object { $_.Classification -eq 'UnmanagedCollision' }).Count | Should -Be 1
+                @($report.Entries | Where-Object { $_.Classification -eq 'UnmanagedMatch' }).Count | Should -Be 1
             }
         }
 
@@ -115,7 +115,7 @@ Describe 'PreventKit TABL block entry read and classification' {
 
                 $report.TotalCount | Should -Be 0
                 $report.ManagedCount | Should -Be 0
-                $report.UnmanagedCollisionCount | Should -Be 0
+                $report.UnmanagedMatchCount | Should -Be 0
                 @($report.Entries).Count | Should -Be 0
             }
         }
@@ -128,14 +128,14 @@ Describe 'PreventKit TABL block entry read and classification' {
                 $classified = @(
                     [pscustomobject]@{ Classification = 'Managed' }
                     [pscustomobject]@{ Classification = 'Managed' }
-                    [pscustomobject]@{ Classification = 'UnmanagedCollision' }
+                    [pscustomobject]@{ Classification = 'UnmanagedMatch' }
                 )
 
                 $report = Get-ClassificationReport -ClassifiedEntries $classified
 
                 $report.TotalCount | Should -Be 3
                 $report.ManagedCount | Should -Be 2
-                $report.UnmanagedCollisionCount | Should -Be 1
+                $report.UnmanagedMatchCount | Should -Be 1
                 @($report.Entries).Count | Should -Be 3
             }
         }
@@ -146,7 +146,7 @@ Describe 'PreventKit TABL block entry read and classification' {
 
                 $report.TotalCount | Should -Be 0
                 $report.ManagedCount | Should -Be 0
-                $report.UnmanagedCollisionCount | Should -Be 0
+                $report.UnmanagedMatchCount | Should -Be 0
             }
         }
     }

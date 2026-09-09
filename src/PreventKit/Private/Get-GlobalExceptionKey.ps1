@@ -8,7 +8,7 @@ Enumerates the global exception declarations (files matching *.exception.psd1)
 in the exception directory and returns the exception keys of the declarations
 that are enabled. Global exceptions are stored, version-controlled, and
 permanent unless edited: they suppress enforcement at every enforcement
-destination on every Run. A disabled declaration contributes no keys, so
+target on every Run. A disabled declaration contributes no keys, so
 disabling or removing it restores enforcement on the next Run.
 
 .OUTPUTS

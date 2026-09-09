@@ -5,8 +5,8 @@ Render a human-readable per-run report from a run log entry.
 .DESCRIPTION
 Produces a readable report for one Run: the run id, status and timing, the
 catalogue directory, each source fingerprint (catalogue, source, hash,
-validation status, parsed counts including subsumed, and any last-known-good
-fallback), the exceptions applied, and the outcome of each destination
+validation status, parsed counts including covered, and any last-known-good
+fallback), the exceptions applied, and the outcome of each target
 reconciliation.
 
 .PARAMETER LogEntry
@@ -57,10 +57,10 @@ function New-PreventKitRunReport {
             $unrepresentableCount = 0
             $unrepresentableProperty = $parsedCounts.PSObject.Properties['Unrepresentable']
             if ($null -ne $unrepresentableProperty) { $unrepresentableCount = $unrepresentableProperty.Value }
-            $subsumedCount = 0
-            $subsumedProperty = $parsedCounts.PSObject.Properties['Subsumed']
-            if ($null -ne $subsumedProperty) { $subsumedCount = $subsumedProperty.Value }
-            $lines += "      services=$servicesCount blockable=$blockableCount unrepresentable=$unrepresentableCount subsumed=$subsumedCount"
+            $coveredCount = 0
+            $coveredProperty = $parsedCounts.PSObject.Properties['Covered']
+            if ($null -ne $coveredProperty) { $coveredCount = $coveredProperty.Value }
+            $lines += "      services=$servicesCount blockable=$blockableCount unrepresentable=$unrepresentableCount covered=$coveredCount"
         }
         if ($fingerprint.FailureReason) {
             $lines += "      failure: $($fingerprint.FailureReason)"
@@ -74,10 +74,10 @@ function New-PreventKitRunReport {
     }
 
     $lines += ''
-    $lines += 'Destination outcomes'
+    $lines += 'Target outcomes'
     $lines += '===================='
-    foreach ($outcome in @($LogEntry.DestinationOutcomes)) {
-        $lines += "  - $($outcome.Destination): $($outcome.Status) add=$($outcome.AddCount) remove=$($outcome.RemoveCount) unchanged=$($outcome.UnchangedCount) collision=$($outcome.UnmanagedCollisionCount)"
+    foreach ($outcome in @($LogEntry.TargetOutcomes)) {
+        $lines += "  - $($outcome.Target): $($outcome.Status) add=$($outcome.AddCount) remove=$($outcome.RemoveCount) unchanged=$($outcome.UnchangedCount) match=$($outcome.UnmanagedMatchCount)"
         $lines += "      preflight: passed=$($outcome.Preflight.Passed) planned=$($outcome.Preflight.PlannedCount) capacity=$($outcome.Preflight.Capacity)"
     }
 

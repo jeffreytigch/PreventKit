@@ -3,12 +3,12 @@ BeforeAll {
     Import-Module $modulePath -Force
 
     $fixtureRoot    = Join-Path $PSScriptRoot 'fixtures'
-    $crossSubsumeDir = Join-Path $fixtureRoot 'cross-subsume'
+    $crossCoveredDir = Join-Path $fixtureRoot 'cross-covered'
 }
 
-Describe 'PreventKit shared subsumed-address classifier' {
+Describe 'PreventKit shared covered-address classifier' {
 
-    It 'classifies a candidate whose normalized tail ends in a wildcard root as subsumed' {
+    It 'classifies a candidate whose normalized tail ends in a wildcard root as covered' {
         InModuleScope PreventKit {
             $representable = @(
                 [pscustomobject]@{ Value = '*.example.com'; Type = 'Domain' }
@@ -17,14 +17,14 @@ Describe 'PreventKit shared subsumed-address classifier' {
                 [pscustomobject]@{ Value = 'foo.example.com'; Reason = 'Not representable' }
             )
 
-            $subsumed = @(Get-SubsumedBlockableAddress -RepresentableAddresses $representable -Candidates $candidates)
+            $covered = @(Get-CoveredBlockableAddress -RepresentableAddresses $representable -Candidates $candidates)
 
-            $subsumed.Count | Should -Be 1
-            $subsumed[0].Value | Should -Be 'foo.example.com'
+            $covered.Count | Should -Be 1
+            $covered[0].Value | Should -Be 'foo.example.com'
         }
     }
 
-    It 'classifies a candidate that equals the wildcard root as subsumed' {
+    It 'classifies a candidate that equals the wildcard root as covered' {
         InModuleScope PreventKit {
             $representable = @(
                 [pscustomobject]@{ Value = '*.example.com'; Type = 'Domain' }
@@ -33,13 +33,13 @@ Describe 'PreventKit shared subsumed-address classifier' {
                 [pscustomobject]@{ Value = 'example.com'; Reason = 'Not representable' }
             )
 
-            $subsumed = @(Get-SubsumedBlockableAddress -RepresentableAddresses $representable -Candidates $candidates)
+            $covered = @(Get-CoveredBlockableAddress -RepresentableAddresses $representable -Candidates $candidates)
 
-            $subsumed.Count | Should -Be 1
+            $covered.Count | Should -Be 1
         }
     }
 
-    It 'does not classify a candidate covered only by a narrower sibling entry as subsumed' {
+    It 'does not classify a candidate covered only by a narrower sibling entry as covered' {
         InModuleScope PreventKit {
             $representable = @(
                 [pscustomobject]@{ Value = 'cloud.example.com'; Type = 'Domain' }
@@ -48,9 +48,9 @@ Describe 'PreventKit shared subsumed-address classifier' {
                 [pscustomobject]@{ Value = 'agentsX-cloud.example.com'; Reason = 'Not representable' }
             )
 
-            $subsumed = @(Get-SubsumedBlockableAddress -RepresentableAddresses $representable -Candidates $candidates)
+            $covered = @(Get-CoveredBlockableAddress -RepresentableAddresses $representable -Candidates $candidates)
 
-            $subsumed.Count | Should -Be 0
+            $covered.Count | Should -Be 0
         }
     }
 
@@ -64,9 +64,9 @@ Describe 'PreventKit shared subsumed-address classifier' {
                 [pscustomobject]@{ Value = 'https://download.anydesk.com/path?q=1'; Reason = 'Not representable' }
             )
 
-            $subsumed = @(Get-SubsumedBlockableAddress -RepresentableAddresses $representable -Candidates $candidates)
+            $covered = @(Get-CoveredBlockableAddress -RepresentableAddresses $representable -Candidates $candidates)
 
-            $subsumed.Count | Should -Be 2
+            $covered.Count | Should -Be 2
         }
     }
 
@@ -79,13 +79,13 @@ Describe 'PreventKit shared subsumed-address classifier' {
                 [pscustomobject]@{ Value = 'relay.gotomypc.com'; Reason = 'Not representable' }
             )
 
-            $subsumed = @(Get-SubsumedBlockableAddress -RepresentableAddresses $representable -Candidates $candidates)
+            $covered = @(Get-CoveredBlockableAddress -RepresentableAddresses $representable -Candidates $candidates)
 
-            $subsumed.Count | Should -Be 1
+            $covered.Count | Should -Be 1
         }
     }
 
-    It 'does not subsume a candidate that merely shares the wildcard root as a suffix at no label boundary' {
+    It 'does not cover a candidate that merely shares the wildcard root as a suffix at no label boundary' {
         InModuleScope PreventKit {
             $representable = @(
                 [pscustomobject]@{ Value = '*.anydesk.com'; Type = 'Domain' }
@@ -95,13 +95,13 @@ Describe 'PreventKit shared subsumed-address classifier' {
                 [pscustomobject]@{ Value = 'badexample.com'; Reason = 'Not representable' }
             )
 
-            $subsumed = @(Get-SubsumedBlockableAddress -RepresentableAddresses $representable -Candidates $candidates)
+            $covered = @(Get-CoveredBlockableAddress -RepresentableAddresses $representable -Candidates $candidates)
 
-            $subsumed.Count | Should -Be 0
+            $covered.Count | Should -Be 0
         }
     }
 
-    It 'leaves genuinely unrepresentable candidates out of the subsumed collection' {
+    It 'leaves genuinely unrepresentable candidates out of the covered collection' {
         InModuleScope PreventKit {
             $representable = @(
                 [pscustomobject]@{ Value = '*.example.com'; Type = 'Domain' }
@@ -111,9 +111,9 @@ Describe 'PreventKit shared subsumed-address classifier' {
                 [pscustomobject]@{ Value = 'agents*-cloud.acronis.com'; Reason = 'Not representable' }
             )
 
-            $subsumed = @(Get-SubsumedBlockableAddress -RepresentableAddresses $representable -Candidates $candidates)
+            $covered = @(Get-CoveredBlockableAddress -RepresentableAddresses $representable -Candidates $candidates)
 
-            $subsumed.Count | Should -Be 0
+            $covered.Count | Should -Be 0
         }
     }
 
@@ -127,16 +127,16 @@ Describe 'PreventKit shared subsumed-address classifier' {
                 [pscustomobject]@{ Value = 'foo.example.com'; Reason = 'Not representable' }
             )
 
-            $subsumed = @(Get-SubsumedBlockableAddress -RepresentableAddresses $representable -Candidates $candidates)
+            $covered = @(Get-CoveredBlockableAddress -RepresentableAddresses $representable -Candidates $candidates)
 
-            $subsumed.Count | Should -Be 0
+            $covered.Count | Should -Be 0
         }
     }
 }
 
-Describe 'PreventKit lolrmm source adapter subsumption' {
+Describe 'PreventKit lolrmm source adapter covering' {
 
-    It 'records wildcard-covered addresses as subsumed and keeps the rest unrepresentable' {
+    It 'records wildcard-covered addresses as covered and keeps the rest unrepresentable' {
         InModuleScope PreventKit {
             $content = @'
 URI,RMM_Tool
@@ -148,14 +148,14 @@ agents*-cloud.acronis.com,Acronis
 
             $parsed = ConvertFrom-LolRmmCsv -Content $content -Scope 'lolrmm'
 
-            @($parsed.Subsumed).Count | Should -Be 1
-            @($parsed.Subsumed | Where-Object { $_.Value -eq 'relay-[a-f0-9]{8}.net.anydesk.com:443' }).Count | Should -Be 1
+            @($parsed.Covered).Count | Should -Be 1
+            @($parsed.Covered | Where-Object { $_.Value -eq 'relay-[a-f0-9]{8}.net.anydesk.com:443' }).Count | Should -Be 1
             @($parsed.Unrepresentable).Count | Should -Be 2
             @($parsed.Unrepresentable | Where-Object { $_.Value -eq 'relay-[a-f0-9]{8}.net.anydesk.com:443' }).Count | Should -Be 0
         }
     }
 
-    It 'does not warn for a subsumed address, only for genuinely unrepresentable ones' {
+    It 'does not warn for a covered address, only for genuinely unrepresentable ones' {
         InModuleScope PreventKit {
             $content = @'
 URI,RMM_Tool
@@ -173,16 +173,16 @@ upload_data.qq.com,QQ
     }
 }
 
-Describe 'PreventKit subsumption is scoped to a catalogue source' {
+Describe 'PreventKit covering is scoped to a catalogue source' {
 
-    It 'does not treat an address subsumed by an entry from another catalogue as subsumed' {
-        $snapshots = @(Invoke-PreventKitRun -CatalogueDirectory $crossSubsumeDir)
+    It 'does not treat an address covered by an entry from another catalogue as covered' {
+        $snapshots = @(Invoke-PreventKitRun -CatalogueDirectory $crossCoveredDir)
 
         $lolrmm = $snapshots | Where-Object { $_.CatalogueName -eq 'lolrmm' }
-        @($lolrmm.Subsumed).Count | Should -Be 0
+        @($lolrmm.Covered).Count | Should -Be 0
 
         $other = $snapshots | Where-Object { $_.CatalogueName -eq 'other' }
-        @($other.Subsumed).Count | Should -Be 0
+        @($other.Covered).Count | Should -Be 0
         @($other.Unrepresentable | Where-Object { $_.Value -eq 'relay-[a-f0-9]{8}.net.anydesk.com:443' }).Count | Should -Be 1
     }
 }

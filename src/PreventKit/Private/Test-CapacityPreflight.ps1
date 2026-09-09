@@ -1,15 +1,15 @@
 <#
 .SYNOPSIS
-Run a capacity preflight check before any write to an enforcement destination.
+Run a capacity preflight check before any write to an enforcement target.
 
 .DESCRIPTION
 Computes the planned managed entry count as the current managed count, minus
 entries that will be removed, plus entries that will be added, and reports
-whether that fits within the destination capacity. The check is purely a
-report; no destination is read or written.
+whether that fits within the target capacity. The check is purely a
+report; no target is read or written.
 
 .PARAMETER CurrentManagedCount
-Number of managed entries currently present in the destination.
+Number of managed entries currently present in the target.
 
 .PARAMETER AddCount
 Number of entries the reconciliation plans to add.
@@ -18,7 +18,7 @@ Number of entries the reconciliation plans to add.
 Number of entries the reconciliation plans to remove.
 
 .PARAMETER Capacity
-Maximum managed entries the destination can hold.
+Maximum managed entries the target can hold.
 
 .OUTPUTS
 System.Management.Automation.PSCustomObject with Passed, PlannedCount and

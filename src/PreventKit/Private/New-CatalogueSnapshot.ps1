@@ -40,7 +40,7 @@ function New-CatalogueSnapshot {
         Services           = @($Parsed.Services).Count
         BlockableAddresses = @($Parsed.BlockableAddresses).Count
         Unrepresentable    = @($Parsed.Unrepresentable).Count
-        Subsumed           = @($Parsed.Subsumed).Count
+        Covered            = @($Parsed.Covered).Count
     }
 
     $fingerprint = [pscustomobject]@{
@@ -57,9 +57,9 @@ function New-CatalogueSnapshot {
         }
     }
 
-    $destinationSettings = @{}
-    if ($Declaration.ContainsKey('Destinations')) {
-        $destinationSettings = $Declaration.Destinations
+    $targetSettings = @{}
+    if ($Declaration.ContainsKey('Targets')) {
+        $targetSettings = $Declaration.Targets
     }
 
     [pscustomobject]@{
@@ -70,8 +70,8 @@ function New-CatalogueSnapshot {
         Services            = @($Parsed.Services)
         BlockableAddresses  = @($Parsed.BlockableAddresses)
         Unrepresentable     = @($Parsed.Unrepresentable)
-        Subsumed            = @($Parsed.Subsumed)
+        Covered             = @($Parsed.Covered)
         Validation          = $Validation
-        DestinationSettings = $destinationSettings
+        TargetSettings = $targetSettings
     }
 }

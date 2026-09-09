@@ -3,21 +3,21 @@
 Build the shared reconciliation result object.
 
 .DESCRIPTION
-Emits the common result shape returned by every enforcement-destination
-reconciliation: the destination name, a status of 'Aborted', 'NoChanges' or
+Emits the common result shape returned by every enforcement-target
+reconciliation: the target name, a status of 'Aborted', 'NoChanges' or
 'Reconciled', the preflight outcome, and the diff counts. Keeping the shape in
 one place stops the reconcilers from drifting.
 
 .OUTPUTS
-System.Management.Automation.PSCustomObject with Destination, Status, Preflight,
-AddCount, RemoveCount, UnchangedCount and UnmanagedCollisionCount properties.
+System.Management.Automation.PSCustomObject with Target, Status, Preflight,
+AddCount, RemoveCount, UnchangedCount and UnmanagedMatchCount properties.
 #>
 function New-ReconcileResult {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-        [string]$Destination,
+        [string]$Target,
 
         [Parameter(Mandatory)]
         [ValidateSet('Aborted', 'NoChanges', 'Reconciled')]
@@ -36,16 +36,16 @@ function New-ReconcileResult {
         [int]$UnchangedCount,
 
         [Parameter(Mandatory)]
-        [int]$UnmanagedCollisionCount
+        [int]$UnmanagedMatchCount
     )
 
     [pscustomobject]@{
-        Destination             = $Destination
+        Target             = $Target
         Status                  = $Status
         Preflight               = $Preflight
         AddCount                = $AddCount
         RemoveCount             = $RemoveCount
         UnchangedCount          = $UnchangedCount
-        UnmanagedCollisionCount = $UnmanagedCollisionCount
+        UnmanagedMatchCount = $UnmanagedMatchCount
     }
 }

@@ -1,22 +1,22 @@
 <#
 .SYNOPSIS
 Compute the reconciliation diff between the desired entries and the current
-destination entries.
+target entries.
 
 .DESCRIPTION
-Takes the desired entries (each carrying a Value) and the current destination
+Takes the desired entries (each carrying a Value) and the current target
 entries that the caller supplies (each carrying a value field and a
-Classification of 'Managed' or 'UnmanagedCollision', as produced by the read
+Classification of 'Managed' or 'UnmanagedMatch', as produced by the read
 side) and computes what must be added, what must be removed, and what is
 already in place. Managed entries that are no longer desired are removed; a
 desired value that is already present, managed or unmanaged, is never added a
-second time; unmanaged collisions are counted but never scheduled for removal.
+second time; unmanaged matches are counted but never scheduled for removal.
 
 .PARAMETER DesiredEntries
 Desired entries. Each must expose a Value property.
 
 .PARAMETER CurrentEntries
-Current classified destination entries. Each must expose the value property
+Current classified target entries. Each must expose the value property
 named by CurrentValueProperty and a Classification property.
 
 .PARAMETER CurrentValueProperty
@@ -25,7 +25,7 @@ Name of the value property on the current entries (TABL: 'Value', CNI:
 
 .OUTPUTS
 System.Management.Automation.PSCustomObject with Adds, Removes, Unchanged,
-AddCount, RemoveCount, UnchangedCount and UnmanagedCollisionCount properties.
+AddCount, RemoveCount, UnchangedCount and UnmanagedMatchCount properties.
 #>
 function Get-ReconcileDiff {
     [CmdletBinding()]
@@ -54,7 +54,7 @@ function Get-ReconcileDiff {
         [pscustomobject]@{
             Entry          = $_
             Value          = if ($valueProp) { [string]$valueProp.Value } else { [string]::Empty }
-            Classification = if ($classificationProp) { [string]$classificationProp.Value } else { 'UnmanagedCollision' }
+            Classification = if ($classificationProp) { [string]$classificationProp.Value } else { 'UnmanagedMatch' }
         }
     })
 
@@ -73,6 +73,6 @@ function Get-ReconcileDiff {
         AddCount                = @($adds).Count
         RemoveCount             = @($removes).Count
         UnchangedCount          = @($unchanged).Count
-        UnmanagedCollisionCount = @($unmanaged).Count
+        UnmanagedMatchCount = @($unmanaged).Count
     }
 }

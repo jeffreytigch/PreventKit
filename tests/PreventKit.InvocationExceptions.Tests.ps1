@@ -105,7 +105,7 @@ Describe 'PreventKit invocation exception key matching' {
     }
 }
 
-Describe 'PreventKit invocation exceptions are non-overriding in reconciliation' {
+Describe 'PreventKit invocation exceptions are managed-only in reconciliation' {
 
     It 'removes already-enforced managed entries for suppressed keys and adds none for them' {
         InModuleScope PreventKit -Parameters @{ cleanDir = $cleanDir } {
@@ -161,14 +161,14 @@ Describe 'PreventKit invocation exceptions are non-overriding in reconciliation'
                 [pscustomobject]@{ indicatorValue = 'server.absolute.com'; indicatorType = 'DomainName'; description = 'PreventKit managed entry'; id = 'c2'; action = 'Block' }
             )
 
-            Mock Add-CniManagedEntry { return $Projections }
+            Mock Add-CniManagedEntry { return $Mappings }
             Mock Remove-CniManagedEntry { }
 
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -CniCapacity 10 -CniCurrentEntries $currentCni `
                 -ExceptionKey @('service:lolrmm/AnyDesk') -CniToken 'test-token'
 
             Assert-MockCalled Add-CniManagedEntry -Times 0 -Exactly -ParameterFilter {
-                @($Projections | Where-Object { $_.Value -match 'anydesk' }).Count -gt 0
+                @($Mappings | Where-Object { $_.Value -match 'anydesk' }).Count -gt 0
             }
             Assert-MockCalled Remove-CniManagedEntry -Times 1 -Exactly -ParameterFilter {
                 @($Id | Where-Object { $_ -eq 'c1' }).Count -gt 0

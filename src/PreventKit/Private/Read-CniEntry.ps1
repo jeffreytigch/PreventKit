@@ -6,8 +6,8 @@ Normalize and classify raw MDE Custom Network Indicator entries.
 Takes the raw indicator objects returned by the Defender api/indicators
 endpoint and normalizes each into a managed-entry record carrying the indicator
 value, type, title, description, id and action, and classifies the entry as a
-PreventKit managed entry or an administrator-owned unmanaged collision from the
-provenance carried in its description field. One object is emitted per input
+PreventKit managed entry or an administrator-owned unmanaged match from the
+owner marker carried in its description field. One object is emitted per input
 entry.
 
 .OUTPUTS

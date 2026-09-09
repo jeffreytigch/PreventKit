@@ -6,9 +6,9 @@ Write a durable run log entry for one Run.
 Persists one JSON file per Run under the log directory, capturing the run id
 and timing, the catalogue directory, the exception keys applied, the source
 fingerprints of every catalogue snapshot, the reconciliation outcomes per
-enforcement destination, the destination configurations, and the Run status.
+enforcement target, the target configurations, and the Run status.
 Runs that complete normally are recorded with status 'Completed'; when a
-destination aborts (for example a capacity preflight failure) the Run status
+target aborts (for example a capacity preflight failure) the Run status
 reflects that partial completion as 'Partial' unless the caller supplies an
 explicit status; a failing Run is recorded with status 'Failed' and its error
 message. The entry is emitted as an object; callers that do not want it on the
@@ -47,11 +47,11 @@ function Write-PreventKitRunLog {
 
         [Parameter()]
         [AllowEmptyCollection()]
-        [object[]]$DestinationOutcomes = @(),
+        [object[]]$TargetOutcomes = @(),
 
         [Parameter()]
         [AllowEmptyCollection()]
-        [object[]]$DestinationConfigurations = @(),
+        [object[]]$TargetConfigurations = @(),
 
         [Parameter()]
         [ValidateSet('Completed', 'Partial', 'Failed')]
@@ -63,7 +63,7 @@ function Write-PreventKitRunLog {
 
     $effectiveStatus = $Status
     if (-not $PSBoundParameters.ContainsKey('Status')) {
-        if (@($DestinationOutcomes | Where-Object { $_.Status -eq 'Aborted' }).Count -gt 0) {
+        if (@($TargetOutcomes | Where-Object { $_.Status -eq 'Aborted' }).Count -gt 0) {
             $effectiveStatus = 'Partial'
         }
     }
@@ -81,7 +81,7 @@ function Write-PreventKitRunLog {
         }
     })
 
-    $destinationConfigs = @($DestinationConfigurations | ForEach-Object {
+    $targetConfigs = @($TargetConfigurations | ForEach-Object {
         $config = $_
         # Handle both hashtables and pscustomobjects
         $hasProp = { param($obj, $name)
@@ -93,7 +93,7 @@ function Write-PreventKitRunLog {
             return $obj.$name
         }
         [pscustomobject]@{
-            Destination              = & $getProp $config 'Destination'
+            Target              = & $getProp $config 'Target'
             ConfigurationMode        = & $getProp $config 'ConfigurationMode'
             Capacity                 = & $getProp $config 'Capacity'
             Status                   = & $getProp $config 'Status'
@@ -103,7 +103,7 @@ function Write-PreventKitRunLog {
             AddCount                 = if (& $hasProp $config 'AddCount') { & $getProp $config 'AddCount' } else { $null }
             RemoveCount              = if (& $hasProp $config 'RemoveCount') { & $getProp $config 'RemoveCount' } else { $null }
             UnchangedCount           = if (& $hasProp $config 'UnchangedCount') { & $getProp $config 'UnchangedCount' } else { $null }
-            UnmanagedCollisionCount  = if (& $hasProp $config 'UnmanagedCollisionCount') { & $getProp $config 'UnmanagedCollisionCount' } else { $null }
+            UnmanagedMatchCount  = if (& $hasProp $config 'UnmanagedMatchCount') { & $getProp $config 'UnmanagedMatchCount' } else { $null }
         }
     })
 
@@ -115,8 +115,8 @@ function Write-PreventKitRunLog {
         Exceptions               = @($ExceptionKey)
         GlobalExceptions         = @($GlobalExceptionKey)
         SourceFingerprints       = @($fingerprints)
-        DestinationOutcomes      = @($DestinationOutcomes)
-        DestinationConfigurations = @($destinationConfigs)
+        TargetOutcomes      = @($TargetOutcomes)
+        TargetConfigurations = @($targetConfigs)
         Status                   = $effectiveStatus
         ErrorMessage             = if ([string]::IsNullOrWhiteSpace($ErrorMessage)) { $null } else { $ErrorMessage }
     }

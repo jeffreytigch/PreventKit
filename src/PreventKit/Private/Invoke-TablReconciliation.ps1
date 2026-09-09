@@ -1,13 +1,13 @@
 <#
 .SYNOPSIS
-Reconcile the Tenant Allow/Block List URL block entries to the projected
+Reconcile the Tenant Allow/Block List URL block entries to the mapped
 desired state.
 
 .DESCRIPTION
 Runs a capacity preflight before any write, then brings the TABL URL block
-destination in line with the desired entries. Missing values are added as
-permanent managed entries carrying the provenance namespace; stale managed
-entries are removed; unmanaged collisions are never adopted, changed, or
+target in line with the desired entries. Missing values are added as
+permanent managed entries carrying the owner marker; stale managed
+entries are removed; unmanaged matches are never adopted, changed, or
 removed. When the preflight fails, no write happens and the run reports
 Status 'Aborted'.
 
@@ -28,8 +28,8 @@ Maximum number of values to submit per New-TenantAllowBlockListItems call.
 Maximum number of identities to submit per Remove-TenantAllowBlockListItems call.
 
 .OUTPUTS
-System.Management.Automation.PSCustomObject with Destination, Status, Preflight,
-AddCount, RemoveCount, UnchangedCount and UnmanagedCollisionCount properties.
+System.Management.Automation.PSCustomObject with Target, Status, Preflight,
+AddCount, RemoveCount, UnchangedCount and UnmanagedMatchCount properties.
 #>
 function Invoke-TablReconciliation {
     [CmdletBinding()]
@@ -63,18 +63,18 @@ function Invoke-TablReconciliation {
         -AddCount $diff.AddCount -RemoveCount $diff.RemoveCount -Capacity $Capacity
 
     if (-not $preflight.Passed) {
-        return New-ReconcileResult -Destination 'Tabl' -Status 'Aborted' -Preflight $preflight `
+        return New-ReconcileResult -Target 'Tabl' -Status 'Aborted' -Preflight $preflight `
             -AddCount $diff.AddCount -RemoveCount $diff.RemoveCount `
-            -UnchangedCount $diff.UnchangedCount -UnmanagedCollisionCount $diff.UnmanagedCollisionCount
+            -UnchangedCount $diff.UnchangedCount -UnmanagedMatchCount $diff.UnmanagedMatchCount
     }
 
     if ($diff.AddCount -eq 0 -and $diff.RemoveCount -eq 0) {
-        return New-ReconcileResult -Destination 'Tabl' -Status 'NoChanges' -Preflight $preflight `
+        return New-ReconcileResult -Target 'Tabl' -Status 'NoChanges' -Preflight $preflight `
             -AddCount 0 -RemoveCount 0 `
-            -UnchangedCount $diff.UnchangedCount -UnmanagedCollisionCount $diff.UnmanagedCollisionCount
+            -UnchangedCount $diff.UnchangedCount -UnmanagedMatchCount $diff.UnmanagedMatchCount
     }
 
-    $notes = "$($script:provenanceNamespace) managed entry"
+    $notes = "$($script:ownerMarker) managed entry"
 
     if ($diff.AddCount -gt 0) {
         foreach ($batch in @(Get-BatchGroup -Items $diff.Adds -BatchSize $AddBatchSize)) {
@@ -88,7 +88,7 @@ function Invoke-TablReconciliation {
         }
     }
 
-    New-ReconcileResult -Destination 'Tabl' -Status 'Reconciled' -Preflight $preflight `
+    New-ReconcileResult -Target 'Tabl' -Status 'Reconciled' -Preflight $preflight `
         -AddCount $diff.AddCount -RemoveCount $diff.RemoveCount `
-        -UnchangedCount $diff.UnchangedCount -UnmanagedCollisionCount $diff.UnmanagedCollisionCount
+        -UnchangedCount $diff.UnchangedCount -UnmanagedMatchCount $diff.UnmanagedMatchCount
 }

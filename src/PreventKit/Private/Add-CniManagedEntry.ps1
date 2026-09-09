@@ -1,17 +1,17 @@
 <#
 .SYNOPSIS
-Submit MDE Custom Network Indicator projections as permanent managed indicators.
+Submit MDE Custom Network Indicator mappings as permanent managed indicators.
 
 .DESCRIPTION
-Posts the given projections to the import endpoint as permanent (no-expiration)
-Block indicators, each carrying the provenance namespace in its description and
-the source service in its title. Projections are posted in batches of at most
+Posts the given mappings to the import endpoint as permanent (no-expiration)
+Block indicators, each carrying the owner marker in its description and
+the source service in its title. Mappings are posted in batches of at most
 BatchSize indicators, paced to respect the API rate limit (RateLimitPerMinute
 calls per minute) with a Start-Sleep between batches. Each batch request goes
 through Invoke-CniApiRequest so 429 responses back off and retry.
 
-.PARAMETER Projections
-Projected CNI entries. Each must expose Value, IndicatorType and ServiceId.
+.PARAMETER Mappings
+Mapped CNI entries. Each must expose Value, IndicatorType and ServiceId.
 
 .PARAMETER Token
 The access token to authenticate the import requests. Acquired by the caller;
@@ -37,7 +37,7 @@ function Add-CniManagedEntry {
     param(
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
-        [object[]]$Projections,
+        [object[]]$Mappings,
 
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
@@ -60,8 +60,8 @@ function Add-CniManagedEntry {
         [int]$BackoffSeconds = 30
     )
 
-    $projections = @($Projections)
-    if ($projections.Count -eq 0) {
+    $mappings = @($Mappings)
+    if ($mappings.Count -eq 0) {
         return
     }
 
@@ -72,7 +72,7 @@ function Add-CniManagedEntry {
         $delaySeconds = 60.0 / $RateLimitPerMinute
     }
 
-    $batches = @(Get-BatchGroup -Items $projections -BatchSize $BatchSize)
+    $batches = @(Get-BatchGroup -Items $mappings -BatchSize $BatchSize)
     $responses = @()
     $batchIndex = 0
 
@@ -84,7 +84,7 @@ function Add-CniManagedEntry {
                 indicatorType  = $_.IndicatorType
                 action         = 'Block'
                 title          = $_.ServiceId
-                description    = "$($script:provenanceNamespace) managed entry"
+                description    = "$($script:ownerMarker) managed entry"
             }
         })
 

@@ -4,9 +4,9 @@
     Adapter = 'LolRmmCsv'
     Scope   = 'lolrmm'
     Source  = 'lolrmm.csv'
-    Destinations = @{
+    Targets = @{
         Cni = @{
-            AllowExpansion = $true
+            AllowBroadening = $false
         }
     }
 }
