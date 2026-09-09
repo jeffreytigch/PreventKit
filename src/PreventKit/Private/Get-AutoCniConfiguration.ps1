@@ -3,10 +3,19 @@
 Get the automatic CNI configuration for a Run.
 
 .DESCRIPTION
-Acquires a CNI access token from the signed-in Azure CLI session, verifies
+Acquires a CNI access token (uses the caller-supplied Token when provided,
+otherwise acquires one from the signed-in Azure CLI session), verifies
 the caller can read and write CNI indicators, and reads the current indicator
 state from the MDE API. Returns a configuration object or throws if any
-prerequisite fails.
+prerequisite fails. A missing token throws before any request is sent.
+
+.PARAMETER Capacity
+Maximum managed indicators the tenant can hold.
+
+.PARAMETER Token
+Optional caller-supplied access token for the MDE Custom Network Indicators
+API. When supplied, Azure CLI acquisition is skipped in favor of this token,
+but verification and the current-entry read still happen.
 
 .OUTPUTS
 System.Management.Automation.PSCustomObject with Token, Capacity, CurrentEntries,
@@ -17,26 +26,33 @@ function Get-AutoCniConfiguration {
     param(
         [Parameter()]
         [ValidateRange(0, [int]::MaxValue)]
-        [int]$Capacity = 15000
+        [int]$Capacity = 15000,
+
+        [Parameter()]
+        [string]$Token
     )
 
-    # Acquire token from Azure CLI
-    $token = Get-CniTokenFromAzureCli
-    if ([string]::IsNullOrWhiteSpace($token)) {
+    # Use the caller-supplied token as an explicit override; otherwise acquire
+    # one from the signed-in Azure CLI session.
+    $effectiveToken = $Token
+    if ([string]::IsNullOrWhiteSpace($effectiveToken)) {
+        $effectiveToken = Get-CniTokenFromAzureCli
+    }
+    if ([string]::IsNullOrWhiteSpace($effectiveToken)) {
         throw 'Failed to acquire CNI token from Azure CLI. Run "az login" and ensure you have the required permissions.'
     }
 
     # Verify CNI authorization by attempting a read operation
     $currentEntries = @()
     try {
-        $currentEntries = Get-CniCurrentIndicators -Token $token
+        $currentEntries = @(Get-CniCurrentIndicators -Token $effectiveToken)
     }
     catch {
         throw "CNI authorization verification failed: $($_.Exception.Message). Ensure the Azure CLI user has the 'Ti.ReadWrite' (delegated) or 'Ti.ReadWrite.All' (application) permission on the WindowsDefenderATP resource."
     }
 
     [pscustomobject]@{
-        Token                  = $token
+        Token                  = $effectiveToken
         Capacity               = $Capacity
         CurrentEntries         = $currentEntries
         AuthorizationVerified  = $true

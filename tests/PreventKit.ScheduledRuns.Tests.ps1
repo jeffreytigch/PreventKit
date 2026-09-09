@@ -90,8 +90,12 @@ Describe 'PreventKit scheduled Run wrapper' {
     It 'a scheduled Run failing during reconciliation records one Failed entry with partial outcomes' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         InModuleScope PreventKit -Parameters @{ logDir = $logDir; cleanDir = $cleanDir } {
+            Mock Get-ExchangeOnlineSession { return [pscustomobject]@{ IsConnected = $true } }
+            if (-not (Get-Command -Name Get-TenantAllowBlockListItems -ErrorAction SilentlyContinue)) { function Get-TenantAllowBlockListItems { [CmdletBinding()] param($ListType, [switch]$Block) } }
+            Mock Get-TenantAllowBlockListItems { return @() }
             Mock Add-TablManagedEntry { return $Values }
             Mock Remove-TablManagedEntry { }
+            Mock Get-CniCurrentIndicators { return @() }
             Mock Invoke-CniReconciliation { throw 'CNI API unavailable' }
 
             $exitCode = Start-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir `
@@ -110,6 +114,9 @@ Describe 'PreventKit scheduled Run wrapper' {
     It 'a scheduled Run with an aborted target is logged as Partial and exits zero' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         InModuleScope PreventKit -Parameters @{ logDir = $logDir; cleanDir = $cleanDir } {
+            Mock Get-ExchangeOnlineSession { return [pscustomobject]@{ IsConnected = $true } }
+            if (-not (Get-Command -Name Get-TenantAllowBlockListItems -ErrorAction SilentlyContinue)) { function Get-TenantAllowBlockListItems { [CmdletBinding()] param($ListType, [switch]$Block) } }
+            Mock Get-TenantAllowBlockListItems { return @() }
             $exitCode = Start-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 0
 
             $exitCode | Should -Be 0

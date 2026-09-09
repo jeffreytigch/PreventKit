@@ -31,39 +31,27 @@ Directory where run log entries are written.
 
 .PARAMETER TablCapacity
 When supplied, reconcile the Tenant Allow/Block List to the desired state.
+Current entries are always read live from the tenant before reconciliation.
 When -TablAuto is specified, this parameter is ignored and the default P1
 capacity (5000) is used.
 
 .PARAMETER CniCapacity
 When supplied, reconcile Custom Network Indicators to the desired state.
-When -CniAuto is specified, this parameter is ignored and the default capacity
-(15000) is used.
+Selecting CNI automatically acquires a token (using -CniToken when supplied,
+otherwise from the signed-in Azure CLI session), verifies authorization, and
+reads the current indicator state before reconciliation.
 
 .PARAMETER CniToken
-The access token for the MDE Custom Network Indicators API, supplied by the
-caller. Required when CniCapacity is supplied so reconciliation never sends an
-unauthenticated request. Any acquisition method works (interactive, client
-certificate, or managed identity). Ignored when -CniAuto is specified.
-
-.PARAMETER TablCurrentEntries
-Raw current TABL URL block entries (as returned by the read side). Ignored
-when -TablAuto is specified.
-
-.PARAMETER CniCurrentEntries
-Raw current CNI indicators (as returned by the read side). Ignored when
--CniAuto is specified.
+Optional access token for the MDE Custom Network Indicators API. When CNI is
+selected and no token is supplied, one is acquired automatically from the
+signed-in Azure CLI session. Supplying a token skips acquisition but
+verification and the current-entry read still happen.
 
 .PARAMETER TablAuto
 When specified, automatically configure the TABL target: use the default
 Defender for Office 365 Plan 1 capacity (5000), verify an active Exchange
 Online session, and read current URL block entries from the tenant. No manual
-TablCapacity or TablCurrentEntries required.
-
-.PARAMETER CniAuto
-When specified, automatically configure the CNI target: acquire the
-Defender token from the signed-in Azure CLI session, verify the caller can
-read and write CNI, and read the current indicator state from the MDE API.
-No manual CniToken or CniCurrentEntries required.
+TablCapacity required.
 
 .PARAMETER TablCapacityP1
 When specified with -TablCapacity (without -TablAuto), use the Defender for
@@ -76,7 +64,7 @@ Start-PreventKitRun -CatalogueDirectory .\catalogues -StateDirectory .\state -Lo
 Start-PreventKitRun -CatalogueDirectory .\catalogues -LogDirectory .\logs; if ($LASTEXITCODE) { throw }
 
 .EXAMPLE
-Start-PreventKitRun -CatalogueDirectory .\catalogues -TablAuto -CniAuto -LogDirectory .\logs
+Start-PreventKitRun -CatalogueDirectory .\catalogues -TablAuto -LogDirectory .\logs
 
 .OUTPUTS
 System.Int32, the process exit code: 0 on success, 1 on failure.
@@ -113,18 +101,7 @@ function Start-PreventKitRun {
         [string]$CniToken,
 
         [Parameter()]
-        [AllowEmptyCollection()]
-        [object[]]$TablCurrentEntries = @(),
-
-        [Parameter()]
-        [AllowEmptyCollection()]
-        [object[]]$CniCurrentEntries = @(),
-
-        [Parameter()]
         [switch]$TablAuto,
-
-        [Parameter()]
-        [switch]$CniAuto,
 
         [Parameter()]
         [switch]$TablCapacityP1
@@ -149,8 +126,7 @@ function Start-PreventKitRun {
             -StateDirectory $StateDirectory -LogDirectory $LogDirectory `
             -TablCapacity $TablCapacity -CniCapacity $CniCapacity `
             -CniToken $CniToken `
-            -TablCurrentEntries $TablCurrentEntries -CniCurrentEntries $CniCurrentEntries `
-            -TablAuto:$TablAuto -CniAuto:$CniAuto -TablCapacityP1:$TablCapacityP1 `
+            -TablAuto:$TablAuto -TablCapacityP1:$TablCapacityP1 `
             -ErrorAction Stop
 
         return 0

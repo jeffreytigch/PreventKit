@@ -5,9 +5,13 @@ authentication:
 
 - **Custom Network Indicators (CNI)** calls the Microsoft Defender for Endpoint
   API at `api.security.microsoft.com`. Every request carries an
-  `Authorization: Bearer <token>` header. The token is **supplied by the caller
-  at Run time** — PreventKit never acquires it itself, so any acquisition
-  method works.
+  `Authorization: Bearer <token>` header. Selecting CNI (via `-CniCapacity`)
+  automatically configures the target: the Run uses a caller-supplied
+  `-CniToken` when provided, otherwise it acquires one from the signed-in
+  Azure CLI session (`az account get-access-token --resource
+  'https://api.securitycenter.microsoft.com'`). A Run with no token (no
+  `-CniToken` and Azure CLI unavailable or not signed in) fails before any
+  request is sent.
 - **Tenant Allow/Block List (TABL)** writes through Exchange Online PowerShell
   cmdlets (`New-TenantAllowBlockListItems`, `Remove-TenantAllowBlockListItems`).
   These require a **connected Exchange Online session**
@@ -68,9 +72,12 @@ features** → **Custom network indicators**.
 
 ## Step 3 — Acquire a token
 
-PreventKit accepts any token for the `https://api.securitycenter.microsoft.com`
-resource. Pick the flow that fits how the Run is invoked. All three produce a
-token you pass to the Run as `-CniToken`.
+When CNI is selected without `-CniToken`, PreventKit acquires a token
+automatically from the signed-in Azure CLI session. Supplying `-CniToken`
+skips that acquisition (verification and the current-entry read still happen).
+Any token for the `https://api.securitycenter.microsoft.com` resource works —
+pick the flow that fits how the Run is invoked. All three flows below produce
+a token you can pass as `-CniToken`.
 
 ### Interactive (delegated) flow
 
@@ -211,15 +218,16 @@ instead.
 | Manual | Interactive (delegated) | Operator signs in once; no key material to store |
 | Scheduled, no Azure | App-only client certificate | Authenticates as the app, no human session needed |
 | Scheduled, on Azure | Managed identity | No secret to store or rotate; app permission only |
-| Any | Any | The token is always supplied by the caller at Run time |
+| Any | Any (or omit `-CniToken` for automatic Azure CLI acquisition) | An explicit `-CniToken` overrides automatic acquisition |
 
 ## Supplying the token to a Run
 
-The token is supplied by the caller at **Run time** — it is not stored by
-PreventKit and no acquisition method is baked into the module. A manual Run
-passes it as `-CniToken` to `Invoke-PreventKitRun`; the scheduled wrapper
-accepts the same `-CniToken` parameter. A Run that reconciles Custom Network
-Indicators without a token fails before any request is sent.
+The token is resolved at **Run time**: pass `-CniToken` to use an explicit
+token supplied by the caller, or omit it to acquire one automatically from the signed-in Azure CLI
+session. A manual Run passes it as `-CniToken` to `Invoke-PreventKitRun`; the
+scheduled wrapper accepts the same `-CniToken` parameter. A Run that selects
+Custom Network Indicators with no token available (no `-CniToken` and Azure
+CLI unavailable or not signed in) fails before any request is sent.
 
 For the Tenant Allow/Block List target, authentication is separate:
 connect an Exchange Online session (`Connect-ExchangeOnline`) before the Run,

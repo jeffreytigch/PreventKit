@@ -65,9 +65,20 @@ Invoke-PreventKitRun -CatalogueDirectory ./catalogues -ExceptionDirectory ./exce
   -TablCapacity 5000 -CniCapacity 15000
 ```
 
-A **CNI Run authenticates** with a caller-supplied token. Acquire it first (see
-[Authentication](docs/authentication.md)) and pass it as `-CniToken`; a Run that
-reconciles Custom Network Indicators without a token fails before any request:
+A **CNI Run authenticates** automatically whenever CNI is selected: the Run
+uses a caller-supplied `-CniToken` when provided, otherwise it acquires one
+from the signed-in Azure CLI session
+(`az account get-access-token --resource 'https://api.securitycenter.microsoft.com'`).
+A Run with no token (no `-CniToken` and Azure CLI unavailable or not signed
+in) fails before any request is sent (see
+[Authentication](docs/authentication.md)):
+
+```powershell
+Invoke-PreventKitRun -CatalogueDirectory ./catalogues -CniCapacity 15000
+```
+
+To supply a token explicitly (interactive, client certificate, or managed
+identity acquisition — see [Authentication](docs/authentication.md)):
 
 ```powershell
 $token = (az account get-access-token --resource 'https://api.securitycenter.microsoft.com' | ConvertFrom-Json).accessToken

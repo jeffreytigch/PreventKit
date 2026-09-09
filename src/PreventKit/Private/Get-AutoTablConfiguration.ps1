@@ -28,8 +28,10 @@ function Get-AutoTablConfiguration {
     # Read current TABL URL block entries
     $currentEntries = @()
     try {
-        $tablItems = Get-TenantAllowBlockListItems -ListType Url -Block -ErrorAction Stop
-        $currentEntries = @($tablItems | Read-TablBlockEntry)
+        $tablItems = @(Get-TenantAllowBlockListItems -ListType Url -Block -ErrorAction Stop)
+        if ($tablItems.Count -gt 0) {
+            $currentEntries = @($tablItems | Read-TablBlockEntry)
+        }
     }
     catch {
         throw "Failed to read current TABL entries: $($_.Exception.Message)"

@@ -230,11 +230,13 @@ Describe 'PreventKit CNI Run authentication' {
     It 'a CNI Run without a token fails before any request is made' {
         InModuleScope PreventKit -Parameters @{ cleanDir = $cleanDir } {
             $script:fixtureDir = $cleanDir
+            Mock Get-CniTokenFromAzureCli { return $null }
+            Mock Get-CniCurrentIndicators { return @() }
             Mock Invoke-CniReconciliation { }
 
             $errorMessage = $null
             try {
-                Invoke-PreventKitRun -CatalogueDirectory $script:fixtureDir -CniCapacity 10 -CniCurrentEntries @() -ErrorAction Stop
+                Invoke-PreventKitRun -CatalogueDirectory $script:fixtureDir -CniCapacity 10 -ErrorAction Stop
             }
             catch {
                 $errorMessage = $_.Exception.Message
@@ -248,13 +250,14 @@ Describe 'PreventKit CNI Run authentication' {
     It 'forwards the supplied token to CNI reconciliation' {
         InModuleScope PreventKit -Parameters @{ cleanDir = $cleanDir } {
             $script:receivedToken = $null
+            Mock Get-CniCurrentIndicators { return @() }
             Mock Invoke-CniReconciliation {
                 $script:receivedToken = $Token
                 return @()
             }
 
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -CniCapacity 10 `
-                -CniCurrentEntries @() -CniToken 'test-token'
+                -CniToken 'test-token'
 
             $script:receivedToken | Should -Be 'test-token'
             Assert-MockCalled Invoke-CniReconciliation -Times 1 -Exactly

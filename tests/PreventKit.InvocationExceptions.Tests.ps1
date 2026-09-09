@@ -115,10 +115,13 @@ Describe 'PreventKit invocation exceptions are managed-only in reconciliation' {
                 [pscustomobject]@{ Value = '136.243.104.235'; Identity = '3'; Notes = 'PreventKit managed entry' }
             )
 
+            Mock Get-ExchangeOnlineSession { return [pscustomobject]@{ IsConnected = $true } }
+            if (-not (Get-Command -Name Get-TenantAllowBlockListItems -ErrorAction SilentlyContinue)) { function Get-TenantAllowBlockListItems { [CmdletBinding()] param($ListType, [switch]$Block) } }
+            Mock Get-TenantAllowBlockListItems { return $currentTabl }
             Mock Add-TablManagedEntry { return $Values }
             Mock Remove-TablManagedEntry { }
 
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -TablCapacity 10 -TablCurrentEntries $currentTabl `
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -TablCapacity 10 `
                 -ExceptionKey @('service:lolrmm/AnyDesk')
 
             Assert-MockCalled Add-TablManagedEntry -Times 0 -Exactly -ParameterFilter {
@@ -139,10 +142,13 @@ Describe 'PreventKit invocation exceptions are managed-only in reconciliation' {
                 [pscustomobject]@{ Value = '*.anydesk.com'; Identity = '1'; Notes = 'PreventKit managed entry' }
             )
 
+            Mock Get-ExchangeOnlineSession { return [pscustomobject]@{ IsConnected = $true } }
+            if (-not (Get-Command -Name Get-TenantAllowBlockListItems -ErrorAction SilentlyContinue)) { function Get-TenantAllowBlockListItems { [CmdletBinding()] param($ListType, [switch]$Block) } }
+            Mock Get-TenantAllowBlockListItems { return $currentTabl }
             Mock Add-TablManagedEntry { return $Values }
             Mock Remove-TablManagedEntry { }
 
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -TablCapacity 10 -TablCurrentEntries $currentTabl `
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -TablCapacity 10 `
                 -ExceptionKey @('service:lolrmm/AnyDesk')
 
             Assert-MockCalled Add-TablManagedEntry -Times 0 -Exactly -ParameterFilter {
@@ -161,10 +167,11 @@ Describe 'PreventKit invocation exceptions are managed-only in reconciliation' {
                 [pscustomobject]@{ indicatorValue = 'server.absolute.com'; indicatorType = 'DomainName'; description = 'PreventKit managed entry'; id = 'c2'; action = 'Block' }
             )
 
+            Mock Get-CniCurrentIndicators { return $currentCni }
             Mock Add-CniManagedEntry { return $Mappings }
             Mock Remove-CniManagedEntry { }
 
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -CniCapacity 10 -CniCurrentEntries $currentCni `
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -CniCapacity 10 `
                 -ExceptionKey @('service:lolrmm/AnyDesk') -CniToken 'test-token'
 
             Assert-MockCalled Add-CniManagedEntry -Times 0 -Exactly -ParameterFilter {

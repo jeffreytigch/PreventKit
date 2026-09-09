@@ -45,40 +45,32 @@ Directory where last known good catalogue snapshots are persisted.
 Directory where run log entries are written.
 
 .PARAMETER TablCapacity
-When supplied, reconcile the Tenant Allow/Block List to the desired state
-using TablCurrentEntries as the current entries. When -TablAuto is specified,
-this parameter is ignored and the default P1 capacity (5000) is used.
+When supplied, reconcile the Tenant Allow/Block List to the desired state.
+Current entries are always read live from the tenant via
+Get-TenantAllowBlockListItems -ListType Url -Block before reconciliation
+(manual and auto paths alike); a failed read surfaces a Failed run before any
+write. When -TablAuto is specified, this parameter is ignored and the default
+P1 capacity (5000) is used.
 
 .PARAMETER CniCapacity
-When supplied, reconcile Custom Network Indicators to the desired state using
-CniCurrentEntries as the current entries. When -CniAuto is specified, this
-parameter is ignored and the default capacity (15000) is used.
+When supplied, reconcile Custom Network Indicators to the desired state.
+Selecting CNI automatically acquires a token (using -CniToken when supplied,
+otherwise from the signed-in Azure CLI session), verifies the caller can read
+and write CNI, and reads the current indicator state before reconciliation; a
+missing token or failed read surfaces a Failed run before any request.
 
 .PARAMETER CniToken
-The access token for the MDE Custom Network Indicators API, supplied by the
-caller. Required when CniCapacity is supplied so reconciliation never sends an
-unauthenticated request. Any acquisition method works (interactive, client
-certificate, or managed identity). Ignored when -CniAuto is specified.
-
-.PARAMETER TablCurrentEntries
-Raw current TABL URL block entries (as returned by the read side). Ignored
-when -TablAuto is specified.
-
-.PARAMETER CniCurrentEntries
-Raw current CNI indicators (as returned by the read side). Ignored when
--CniAuto is specified.
+Optional access token for the MDE Custom Network Indicators API. When CNI is
+selected and no token is supplied, one is acquired automatically from the
+signed-in Azure CLI session. Supplying a token skips acquisition but
+verification and the current-entry read still happen. Any acquisition method
+works (interactive, client certificate, or managed identity).
 
 .PARAMETER TablAuto
 When specified, automatically configure the TABL target: use the default
 Defender for Office 365 Plan 1 capacity (5000), verify an active Exchange
 Online session, and read current URL block entries from the tenant. No manual
-TablCapacity or TablCurrentEntries required.
-
-.PARAMETER CniAuto
-When specified, automatically configure the CNI target: acquire the
-Defender token from the signed-in Azure CLI session, verify the caller can
-read and write CNI, and read the current indicator state from the MDE API.
-No manual CniToken or CniCurrentEntries required.
+TablCapacity required.
 
 .PARAMETER TablCapacityP1
 When specified with -TablCapacity (without -TablAuto), use the Defender for
@@ -99,7 +91,7 @@ Invoke-PreventKitRun -CatalogueDirectory .\catalogues -ExceptionKey 'service:lol
 Invoke-PreventKitRun -CatalogueDirectory .\tests\fixtures\clean
 
 .EXAMPLE
-Invoke-PreventKitRun -CatalogueDirectory .\catalogues -TablAuto -CniAuto -LogDirectory .\logs
+Invoke-PreventKitRun -CatalogueDirectory .\catalogues -TablAuto -LogDirectory .\logs
 
 .EXAMPLE
 Invoke-PreventKitRun -CatalogueDirectory .\catalogues -TablCapacity 5000 -TablCapacityP1 -LogDirectory .\logs
@@ -141,18 +133,7 @@ function Invoke-PreventKitRun {
         [string]$CniToken,
 
         [Parameter()]
-        [AllowEmptyCollection()]
-        [object[]]$TablCurrentEntries = @(),
-
-        [Parameter()]
-        [AllowEmptyCollection()]
-        [object[]]$CniCurrentEntries = @(),
-
-        [Parameter()]
         [switch]$TablAuto,
-
-        [Parameter()]
-        [switch]$CniAuto,
 
         [Parameter()]
         [switch]$TablCapacityP1,
@@ -233,10 +214,13 @@ function Invoke-PreventKitRun {
         }
         elseif ($TablCapacity -ge 0) {
             $effectiveCapacity = if ($TablCapacityP1) { 5000 } else { $TablCapacity }
+            # Always read live state at the enforcement target before diffing
+            # (manual and auto paths alike); a failed read throws before any write.
+            $liveConfig = Get-AutoTablConfiguration -Capacity $effectiveCapacity
             $tablConfig = [pscustomobject]@{
-                Capacity         = $effectiveCapacity
-                CurrentEntries   = $TablCurrentEntries
-                SessionVerified  = $false
+                Capacity          = $liveConfig.Capacity
+                CurrentEntries    = $liveConfig.CurrentEntries
+                SessionVerified   = $true
                 ConfigurationMode = 'Manual'
             }
             $targetConfigurations += @{
@@ -259,37 +243,19 @@ function Invoke-PreventKitRun {
             }
         }
 
-        # Resolve CNI configuration
+        # Resolve CNI configuration: selecting CNI automatically acquires a token
+        # (caller-supplied -CniToken as override, otherwise from Azure CLI),
+        # verifies authorization, and reads the current indicator state.
         $cniConfig = $null
-        if ($CniAuto) {
-            $cniConfig = Get-AutoCniConfiguration
+        if ($CniCapacity -ge 0) {
+            $cniConfig = Get-AutoCniConfiguration -Capacity $CniCapacity -Token $CniToken
             $targetConfigurations += @{
                 Target              = 'Cni'
                 ConfigurationMode   = 'Auto'
                 Capacity            = $cniConfig.Capacity
                 Status              = 'Selected'
                 ValidationStatus    = 'Validated'
-                SelectionReason     = 'Auto-configured via Azure CLI token'
-            }
-        }
-        elseif ($CniCapacity -ge 0) {
-            if ([string]::IsNullOrWhiteSpace($CniToken)) {
-                throw 'A CNI Run requires a token: supply -CniToken with an MDE Custom Network Indicators API access token, or use -CniAuto to acquire it automatically.'
-            }
-            $cniConfig = [pscustomobject]@{
-                Token                  = $CniToken
-                Capacity               = $CniCapacity
-                CurrentEntries         = $CniCurrentEntries
-                AuthorizationVerified  = $false
-                ConfigurationMode      = 'Manual'
-            }
-            $targetConfigurations += @{
-                Target              = 'Cni'
-                ConfigurationMode   = 'Manual'
-                Capacity            = $CniCapacity
-                Status              = 'Selected'
-                ValidationStatus    = 'Pending'
-                SelectionReason     = 'Manual token and capacity'
+                SelectionReason     = if ([string]::IsNullOrWhiteSpace($CniToken)) { 'Auto-configured via Azure CLI token' } else { 'Auto-configured with caller-supplied token override' }
             }
         }
         else {
@@ -305,7 +271,7 @@ function Invoke-PreventKitRun {
 
         # Execute TABL reconciliation if configured
         if ($tablConfig -and $tablConfig.ConfigurationMode -ne 'None') {
-            $currentEntries = $tablConfig.CurrentEntries
+            $currentEntries = @($tablConfig.CurrentEntries)
             $capacity = $tablConfig.Capacity
 
             $result = Invoke-TablReconciliation -DesiredEntries @($desiredState.BlockableAddresses) `
@@ -321,6 +287,7 @@ function Invoke-PreventKitRun {
                 $config.RemoveCount = if ($result.PSObject.Properties['RemoveCount']) { $result.RemoveCount } else { $null }
                 $config.UnchangedCount = if ($result.PSObject.Properties['UnchangedCount']) { $result.UnchangedCount } else { $null }
                 $config.UnmanagedMatchCount = if ($result.PSObject.Properties['UnmanagedMatchCount']) { $result.UnmanagedMatchCount } else { $null }
+                $config.FailedBatchCount = if ($result.PSObject.Properties['FailedBatchCount']) { $result.FailedBatchCount } else { $null }
             }
 
             $targetOutcomes += $result
@@ -328,7 +295,7 @@ function Invoke-PreventKitRun {
 
         # Execute CNI reconciliation if configured
         if ($cniConfig -and $cniConfig.ConfigurationMode -ne 'None') {
-            $currentEntries = $cniConfig.CurrentEntries
+            $currentEntries = @($cniConfig.CurrentEntries)
             $capacity = $cniConfig.Capacity
             $token = $cniConfig.Token
 

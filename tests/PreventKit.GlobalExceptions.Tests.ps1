@@ -120,11 +120,14 @@ Describe 'PreventKit global exceptions in a full run' {
                 [pscustomobject]@{ Value = 'server.absolute.com'; Identity = '3'; Notes = 'PreventKit managed entry' }
             )
 
+            Mock Get-ExchangeOnlineSession { return [pscustomobject]@{ IsConnected = $true } }
+            if (-not (Get-Command -Name Get-TenantAllowBlockListItems -ErrorAction SilentlyContinue)) { function Get-TenantAllowBlockListItems { [CmdletBinding()] param($ListType, [switch]$Block) } }
+            Mock Get-TenantAllowBlockListItems { return $currentTabl }
             Mock Add-TablManagedEntry { return $Values }
             Mock Remove-TablManagedEntry { }
 
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -ExceptionDirectory $exceptionsDir `
-                -TablCapacity 10 -TablCurrentEntries $currentTabl
+                -TablCapacity 10
 
             Assert-MockCalled Add-TablManagedEntry -Times 0 -Exactly -ParameterFilter {
                 @($Values | Where-Object { $_ -match 'anydesk|GetScreen' }).Count -gt 0
@@ -145,11 +148,12 @@ Describe 'PreventKit global exceptions in a full run' {
                 [pscustomobject]@{ indicatorValue = 'server.absolute.com'; indicatorType = 'DomainName'; description = 'PreventKit managed entry'; id = 'c2'; action = 'Block' }
             )
 
+            Mock Get-CniCurrentIndicators { return $currentCni }
             Mock Add-CniManagedEntry { return $Mappings }
             Mock Remove-CniManagedEntry { }
 
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -ExceptionDirectory $exceptionsDir `
-                -CniCapacity 10 -CniCurrentEntries $currentCni -CniToken 'test-token'
+                -CniCapacity 10 -CniToken 'test-token'
 
             Assert-MockCalled Add-CniManagedEntry -Times 0 -Exactly -ParameterFilter {
                 @($Mappings | Where-Object { $_.Value -match 'anydesk' }).Count -gt 0
@@ -189,6 +193,12 @@ Describe 'PreventKit global exceptions in a full run' {
             Set-Content -LiteralPath (Join-Path $excDir 'anydesk.exception.psd1') -Value $declaration -Encoding utf8
 
             $script:anydeskAdds = 0
+            Mock Get-ExchangeOnlineSession { return [pscustomobject]@{ IsConnected = $true } }
+            if (-not (Get-Command -Name Get-TenantAllowBlockListItems -ErrorAction SilentlyContinue)) { function Get-TenantAllowBlockListItems { [CmdletBinding()] param($ListType, [switch]$Block) } }
+            Mock Get-TenantAllowBlockListItems {
+                if ($script:returnEmptyTabl) { return @() }
+                return $currentTabl
+            }
             Mock Add-TablManagedEntry {
                 if (@($Values | Where-Object { $_ -match 'anydesk' }).Count -gt 0) {
                     $script:anydeskAdds++
@@ -202,16 +212,18 @@ Describe 'PreventKit global exceptions in a full run' {
                 [pscustomobject]@{ Value = 'boot.net.anydesk.com'; Identity = '2'; Notes = 'PreventKit managed entry' }
             )
 
+            $script:returnEmptyTabl = $false
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -ExceptionDirectory $excDir `
-                -TablCapacity 10 -TablCurrentEntries $currentTabl
+                -TablCapacity 10
 
             $script:anydeskAdds | Should -Be 0
 
             Remove-Item -LiteralPath (Join-Path $excDir 'anydesk.exception.psd1') -Force
 
             $script:anydeskAdds = 0
+            $script:returnEmptyTabl = $true
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -ExceptionDirectory $excDir `
-                -TablCapacity 10 -TablCurrentEntries @()
+                -TablCapacity 10
 
             $script:anydeskAdds | Should -Be 1
         }

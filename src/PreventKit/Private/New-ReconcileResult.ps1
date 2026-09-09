@@ -4,9 +4,9 @@ Build the shared reconciliation result object.
 
 .DESCRIPTION
 Emits the common result shape returned by every enforcement-target
-reconciliation: the target name, a status of 'Aborted', 'NoChanges' or
-'Reconciled', the preflight outcome, and the diff counts. Keeping the shape in
-one place stops the reconcilers from drifting.
+reconciliation: the target name, status, preflight outcome, diff counts, and
+optional per-batch write results. Keeping the shape in one place stops the
+reconcilers from drifting.
 
 .OUTPUTS
 System.Management.Automation.PSCustomObject with Target, Status, Preflight,
@@ -20,7 +20,7 @@ function New-ReconcileResult {
         [string]$Target,
 
         [Parameter(Mandatory)]
-        [ValidateSet('Aborted', 'NoChanges', 'Reconciled')]
+        [ValidateSet('Aborted', 'NoChanges', 'Reconciled', 'PartiallyReconciled')]
         [string]$Status,
 
         [Parameter(Mandatory)]
@@ -36,7 +36,15 @@ function New-ReconcileResult {
         [int]$UnchangedCount,
 
         [Parameter(Mandatory)]
-        [int]$UnmanagedMatchCount
+        [int]$UnmanagedMatchCount,
+
+        [Parameter()]
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$FailedBatchCount = 0,
+
+        [Parameter()]
+        [AllowEmptyCollection()]
+        [object[]]$BatchResults = @()
     )
 
     [pscustomobject]@{
@@ -47,5 +55,7 @@ function New-ReconcileResult {
         RemoveCount           = $RemoveCount
         UnchangedCount        = $UnchangedCount
         UnmanagedMatchCount   = $UnmanagedMatchCount
+        FailedBatchCount      = $FailedBatchCount
+        BatchResults          = @($BatchResults)
     }
 }

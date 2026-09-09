@@ -63,7 +63,7 @@ function Write-PreventKitRunLog {
 
     $effectiveStatus = $Status
     if (-not $PSBoundParameters.ContainsKey('Status')) {
-        if (@($TargetOutcomes | Where-Object { $_.Status -eq 'Aborted' }).Count -gt 0) {
+        if (@($TargetOutcomes | Where-Object { $_.Status -in @('Aborted', 'PartiallyReconciled') }).Count -gt 0) {
             $effectiveStatus = 'Partial'
         }
     }
@@ -104,6 +104,7 @@ function Write-PreventKitRunLog {
             RemoveCount               = if (& $hasProp $config 'RemoveCount') { & $getProp $config 'RemoveCount' } else { $null }
             UnchangedCount            = if (& $hasProp $config 'UnchangedCount') { & $getProp $config 'UnchangedCount' } else { $null }
             UnmanagedMatchCount       = if (& $hasProp $config 'UnmanagedMatchCount') { & $getProp $config 'UnmanagedMatchCount' } else { $null }
+            FailedBatchCount          = if (& $hasProp $config 'FailedBatchCount') { & $getProp $config 'FailedBatchCount' } else { $null }
         }
     })
 

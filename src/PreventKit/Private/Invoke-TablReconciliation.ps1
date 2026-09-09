@@ -23,13 +23,20 @@ Maximum managed URL block entries the tenant can hold.
 
 .PARAMETER AddBatchSize
 Maximum number of values to submit per New-TenantAllowBlockListItems call.
+Operational choice (default 50) within the tenant block-entry limits: the
+cmdlet accepts an -Entries array in a single call and no documented per-call
+entry count cap exists; the binding limits are the tenant totals (500 / 1,000 /
+10,000 block entries depending on license).
 
 .PARAMETER RemoveBatchSize
 Maximum number of identities to submit per Remove-TenantAllowBlockListItems call.
+Operational choice (default 100), symmetric with the add path: the remove path
+uses the same Get-BatchGroup batching.
 
 .OUTPUTS
 System.Management.Automation.PSCustomObject with Target, Status, Preflight,
-AddCount, RemoveCount, UnchangedCount and UnmanagedMatchCount properties.
+AddCount, RemoveCount, UnchangedCount, UnmanagedMatchCount, FailedBatchCount,
+and BatchResults properties.
 #>
 function Invoke-TablReconciliation {
     [CmdletBinding()]
@@ -76,19 +83,87 @@ function Invoke-TablReconciliation {
 
     $notes = "$($script:ownerMarker) managed entry"
 
+    # One cmdlet call per batch (never per entry), with the batch -Entries array
+    # in a single call. Each batch is attempted independently and its response is
+    # retained so partial entry failures do not hide behind a successful command.
+    $batchResults = @()
+
     if ($diff.AddCount -gt 0) {
         foreach ($batch in @(Get-BatchGroup -Items $diff.Adds -BatchSize $AddBatchSize)) {
-            $null = Add-TablManagedEntry -Values @($batch | ForEach-Object { $_.Value }) -Notes $notes
+            $values = @($batch | ForEach-Object { $_.Value })
+            try {
+                $addResult = Add-TablManagedEntry -Values $values -Notes $notes
+                $normalizedResult = @($addResult | Where-Object { $_.PSObject.Properties['HasFailures'] })
+                $hasFailures = @($normalizedResult | Where-Object { $_.HasFailures }).Count -gt 0
+                $successConfirmed = if ($normalizedResult.Count -eq 1 -and $normalizedResult[0].PSObject.Properties['IsSuccessConfirmed']) {
+                    $normalizedResult[0].IsSuccessConfirmed
+                }
+                else {
+                    -not $hasFailures
+                }
+                $response = if ($normalizedResult.Count -eq 1) { $normalizedResult[0].Response } else { $addResult }
+                $rawResponse = if ($normalizedResult.Count -eq 1 -and $normalizedResult[0].PSObject.Properties['RawResponse']) {
+                    $normalizedResult[0].RawResponse
+                }
+                else {
+                    $addResult
+                }
+                $batchResults += [pscustomobject]@{
+                    Operation    = 'Add'
+                    Items        = $values
+                    Status       = if ($hasFailures) { 'Partial' } elseif ($successConfirmed) { 'Succeeded' } else { 'Unverified' }
+                    ErrorMessage = $null
+                    RawResponse  = $rawResponse
+                    Response     = $response
+                }
+            }
+            catch {
+                $batchResults += [pscustomobject]@{
+                    Operation    = 'Add'
+                    Items        = $values
+                    Status       = 'Failed'
+                    ErrorMessage = $_.Exception.Message
+                    RawResponse  = $null
+                    Response     = $null
+                }
+                Write-Verbose "TABL add batch failed, continuing with remaining batches: $($_.Exception.Message)"
+            }
         }
     }
 
     if ($diff.RemoveCount -gt 0) {
         foreach ($batch in @(Get-BatchGroup -Items $diff.Removes -BatchSize $RemoveBatchSize)) {
-            $null = Remove-TablManagedEntry -Identities @($batch | ForEach-Object { $_.Identity })
+            $identities = @($batch | ForEach-Object { $_.Identity })
+            try {
+                $removeResponse = Remove-TablManagedEntry -Identities $identities
+                $batchResults += [pscustomobject]@{
+                    Operation    = 'Remove'
+                    Items        = $identities
+                    Status       = 'Succeeded'
+                    ErrorMessage = $null
+                    RawResponse  = $removeResponse
+                    Response     = $removeResponse
+                }
+            }
+            catch {
+                $batchResults += [pscustomobject]@{
+                    Operation    = 'Remove'
+                    Items        = $identities
+                    Status       = 'Failed'
+                    ErrorMessage = $_.Exception.Message
+                    RawResponse  = $null
+                    Response     = $null
+                }
+                Write-Verbose "TABL remove batch failed, continuing with remaining batches: $($_.Exception.Message)"
+            }
         }
     }
 
-    New-ReconcileResult -Target 'Tabl' -Status 'Reconciled' -Preflight $preflight `
+    $failedBatchCount = @($batchResults | Where-Object { $_.Status -in @('Partial', 'Failed', 'Unverified') }).Count
+    $status = if ($failedBatchCount -gt 0) { 'PartiallyReconciled' } else { 'Reconciled' }
+
+    New-ReconcileResult -Target 'Tabl' -Status $status -Preflight $preflight `
         -AddCount $diff.AddCount -RemoveCount $diff.RemoveCount `
-        -UnchangedCount $diff.UnchangedCount -UnmanagedMatchCount $diff.UnmanagedMatchCount
+        -UnchangedCount $diff.UnchangedCount -UnmanagedMatchCount $diff.UnmanagedMatchCount `
+        -FailedBatchCount $failedBatchCount -BatchResults $batchResults
 }

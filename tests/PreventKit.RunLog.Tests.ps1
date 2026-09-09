@@ -28,15 +28,18 @@ Describe 'PreventKit run log' {
     It 'records reconciliation changes and their outcomes per target' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         InModuleScope PreventKit -Parameters @{ logDir = $logDir; cleanDir = $cleanDir } {
-            Mock Add-TablManagedEntry { return $Values }
-            Mock Remove-TablManagedEntry { }
-
             $currentTabl = @(
                 [pscustomobject]@{ Value = 'server.absolute.com'; Identity = '1'; Notes = 'PreventKit managed entry' },
                 [pscustomobject]@{ Value = 'stale.example.org'; Identity = '2'; Notes = 'PreventKit managed entry' }
             )
 
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 10 -TablCurrentEntries $currentTabl
+            Mock Get-ExchangeOnlineSession { return [pscustomobject]@{ IsConnected = $true } }
+            if (-not (Get-Command -Name Get-TenantAllowBlockListItems -ErrorAction SilentlyContinue)) { function Get-TenantAllowBlockListItems { [CmdletBinding()] param($ListType, [switch]$Block) } }
+            Mock Get-TenantAllowBlockListItems { return $currentTabl }
+            Mock Add-TablManagedEntry { return $Values }
+            Mock Remove-TablManagedEntry { }
+
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 10
 
             $entries = @(Get-PreventKitRunLog -LogDirectory $logDir)
             $entries[0].TargetOutcomes.Count | Should -Be 1
@@ -68,6 +71,9 @@ Describe 'PreventKit run log' {
     It 'a per-run report surfaces the run status so a Partial run is visible' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         InModuleScope PreventKit -Parameters @{ logDir = $logDir; cleanDir = $cleanDir } {
+            Mock Get-ExchangeOnlineSession { return [pscustomobject]@{ IsConnected = $true } }
+            if (-not (Get-Command -Name Get-TenantAllowBlockListItems -ErrorAction SilentlyContinue)) { function Get-TenantAllowBlockListItems { [CmdletBinding()] param($ListType, [switch]$Block) } }
+            Mock Get-TenantAllowBlockListItems { return @() }
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 0
 
             $entry = @(Get-PreventKitRunLog -LogDirectory $logDir)[0]
@@ -124,8 +130,12 @@ Describe 'PreventKit run log' {
     It 'a Run that fails during reconciliation writes a Failed entry with the error and partial outcomes' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         InModuleScope PreventKit -Parameters @{ logDir = $logDir; cleanDir = $cleanDir } {
+            Mock Get-ExchangeOnlineSession { return [pscustomobject]@{ IsConnected = $true } }
+            if (-not (Get-Command -Name Get-TenantAllowBlockListItems -ErrorAction SilentlyContinue)) { function Get-TenantAllowBlockListItems { [CmdletBinding()] param($ListType, [switch]$Block) } }
+            Mock Get-TenantAllowBlockListItems { return @() }
             Mock Add-TablManagedEntry { return $Values }
             Mock Remove-TablManagedEntry { }
+            Mock Get-CniCurrentIndicators { return @() }
             Mock Invoke-CniReconciliation { throw 'CNI API unavailable' }
 
             { Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir `
@@ -144,6 +154,9 @@ Describe 'PreventKit run log' {
     It 'a Run whose target aborts on capacity preflight is logged as Partial with the Aborted outcome' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         InModuleScope PreventKit -Parameters @{ logDir = $logDir; cleanDir = $cleanDir } {
+            Mock Get-ExchangeOnlineSession { return [pscustomobject]@{ IsConnected = $true } }
+            if (-not (Get-Command -Name Get-TenantAllowBlockListItems -ErrorAction SilentlyContinue)) { function Get-TenantAllowBlockListItems { [CmdletBinding()] param($ListType, [switch]$Block) } }
+            Mock Get-TenantAllowBlockListItems { return @() }
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 0
 
             $entries = @(Get-PreventKitRunLog -LogDirectory $logDir)

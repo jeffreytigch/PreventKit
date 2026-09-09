@@ -21,7 +21,7 @@ Classification properties.
 function Read-TablBlockEntry {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ValueFromPipeline)]
         [AllowEmptyCollection()]
         [object[]]$Entries
     )
