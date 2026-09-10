@@ -8,22 +8,26 @@ BeforeAll {
 
 Describe 'Ticket #39 auto-detect current entries' {
 
-    It 'Invoke-PreventKitRun no longer exposes TablCurrentEntries, CniCurrentEntries or CniAuto' {
+    It 'Invoke-PreventKitRun no longer exposes TablCurrentEntries, CniCurrentEntries, CniAuto, TablAuto or TablCapacityP1' {
         $parameters = (Get-Command Invoke-PreventKitRun).Parameters.Keys
 
         $parameters | Should -Not -Contain 'TablCurrentEntries'
         $parameters | Should -Not -Contain 'CniCurrentEntries'
         $parameters | Should -Not -Contain 'CniAuto'
-        $parameters | Should -Contain 'TablAuto'
+        $parameters | Should -Not -Contain 'TablAuto'
+        $parameters | Should -Not -Contain 'TablCapacityP1'
+        $parameters | Should -Contain 'TablCapacity'
         $parameters | Should -Contain 'CniToken'
     }
 
-    It 'Start-PreventKitRun no longer exposes TablCurrentEntries, CniCurrentEntries or CniAuto' {
+    It 'Start-PreventKitRun no longer exposes TablCurrentEntries, CniCurrentEntries, CniAuto, TablAuto or TablCapacityP1' {
         $parameters = (Get-Command Start-PreventKitRun).Parameters.Keys
 
         $parameters | Should -Not -Contain 'TablCurrentEntries'
         $parameters | Should -Not -Contain 'CniCurrentEntries'
         $parameters | Should -Not -Contain 'CniAuto'
+        $parameters | Should -Not -Contain 'TablAuto'
+        $parameters | Should -Not -Contain 'TablCapacityP1'
     }
 
     It 'a TABL run reads current entries live via Get-TenantAllowBlockListItems (manual path)' {
@@ -34,7 +38,7 @@ Describe 'Ticket #39 auto-detect current entries' {
             Mock Add-TablManagedEntry { return $Values }
             Mock Remove-TablManagedEntry { }
 
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -TablCapacity 10
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -Target Tabl -TablCapacity 10
 
             Assert-MockCalled Get-TenantAllowBlockListItems -Times 1 -Exactly -ParameterFilter { $ListType -eq 'Url' -and $Block }
         }
@@ -46,7 +50,7 @@ Describe 'Ticket #39 auto-detect current entries' {
             Mock Add-CniManagedEntry { return $Mappings }
             Mock Remove-CniManagedEntry { }
 
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -CniCapacity 10 -CniToken 'test-token'
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -Target Cni -CniCapacity 10 -CniToken 'test-token'
 
             Assert-MockCalled Get-CniCurrentIndicators -Times 1 -Exactly
         }
@@ -88,7 +92,7 @@ Describe 'Ticket #40 pre-check existence before TABL adds' {
             Mock Add-TablManagedEntry { return $Values }
             Mock Remove-TablManagedEntry { }
 
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 10
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -Target Tabl -TablCapacity 10
 
             Assert-MockCalled Add-TablManagedEntry -Times 0 -Exactly
             Assert-MockCalled Remove-TablManagedEntry -Times 0 -Exactly
@@ -113,7 +117,7 @@ Describe 'Ticket #40 pre-check existence before TABL adds' {
             Mock Add-TablManagedEntry { return $Values }
             Mock Remove-TablManagedEntry { }
 
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 10
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -Target Tabl -TablCapacity 10
 
             Assert-MockCalled Add-TablManagedEntry -Times 0 -Exactly -ParameterFilter {
                 @($Values | Where-Object { $_ -in @('*.anydesk.com', 'boot.net.anydesk.com') }).Count -gt 0
@@ -133,7 +137,7 @@ Describe 'Ticket #40 pre-check existence before TABL adds' {
             Mock Add-TablManagedEntry { return $Values }
             Mock Remove-TablManagedEntry { }
 
-            { Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 10 -ErrorAction Stop } | Should -Throw
+            { Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -Target Tabl -TablCapacity 10 -ErrorAction Stop } | Should -Throw
 
             Assert-MockCalled Add-TablManagedEntry -Times 0 -Exactly
             Assert-MockCalled Remove-TablManagedEntry -Times 0 -Exactly
@@ -153,7 +157,7 @@ Describe 'Ticket #41 CNI automatic configuration by default' {
             Mock Add-CniManagedEntry { return $Mappings }
             Mock Remove-CniManagedEntry { }
 
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -CniCapacity 10 -CniToken 'explicit-token'
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -Target Cni -CniCapacity 10 -CniToken 'explicit-token'
 
             Assert-MockCalled Get-CniTokenFromAzureCli -Times 0 -Exactly
             Assert-MockCalled Get-CniCurrentIndicators -Times 1 -Exactly
@@ -171,7 +175,7 @@ Describe 'Ticket #41 CNI automatic configuration by default' {
             Mock Add-CniManagedEntry { return $Mappings }
             Mock Remove-CniManagedEntry { }
 
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -CniCapacity 10
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -Target Cni -CniCapacity 10
 
             $script:usedToken | Should -Be 'cli-token'
         }
@@ -185,7 +189,7 @@ Describe 'Ticket #41 CNI automatic configuration by default' {
 
             $errorMessage = $null
             try {
-                Invoke-PreventKitRun -CatalogueDirectory $cleanDir -CniCapacity 10 -ErrorAction Stop
+                Invoke-PreventKitRun -CatalogueDirectory $cleanDir -Target Cni -CniCapacity 10 -ErrorAction Stop
             }
             catch {
                 $errorMessage = $_.Exception.Message
@@ -407,7 +411,7 @@ Describe 'Ticket #42 TABL batch operations' {
             }
             Mock Remove-TablManagedEntry { }
 
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 10
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -Target Tabl -TablCapacity 10
 
             Assert-MockCalled New-TenantAllowBlockListItems -Times 1 -Exactly
             $persisted = @(Get-PreventKitRunLog -LogDirectory $logDir)[0]

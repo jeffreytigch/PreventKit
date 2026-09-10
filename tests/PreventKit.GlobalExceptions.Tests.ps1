@@ -9,6 +9,9 @@ BeforeAll {
     $emptyExcDir      = Join-Path $fixtureRoot 'exceptions-empty'
 }
 
+Describe 'PreventKit target seams' {
+    BeforeEach { . (Join-Path $PSScriptRoot '_PreventKitTargetSeams.ps1') }
+
 Describe 'PreventKit global exception declaration loading' {
 
     It 'reads exception keys from enabled global exception declarations' {
@@ -127,7 +130,7 @@ Describe 'PreventKit global exceptions in a full run' {
             Mock Remove-TablManagedEntry { }
 
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -ExceptionDirectory $exceptionsDir `
-                -TablCapacity 10
+                -Target Tabl -TablCapacity 10
 
             Assert-MockCalled Add-TablManagedEntry -Times 0 -Exactly -ParameterFilter {
                 @($Values | Where-Object { $_ -match 'anydesk|GetScreen' }).Count -gt 0
@@ -153,7 +156,7 @@ Describe 'PreventKit global exceptions in a full run' {
             Mock Remove-CniManagedEntry { }
 
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -ExceptionDirectory $exceptionsDir `
-                -CniCapacity 10 -CniToken 'test-token'
+                -Target Cni -CniCapacity 10 -CniToken 'test-token'
 
             Assert-MockCalled Add-CniManagedEntry -Times 0 -Exactly -ParameterFilter {
                 @($Mappings | Where-Object { $_.Value -match 'anydesk' }).Count -gt 0
@@ -214,7 +217,7 @@ Describe 'PreventKit global exceptions in a full run' {
 
             $script:returnEmptyTabl = $false
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -ExceptionDirectory $excDir `
-                -TablCapacity 10
+                -Target Tabl -TablCapacity 10
 
             $script:anydeskAdds | Should -Be 0
 
@@ -223,9 +226,10 @@ Describe 'PreventKit global exceptions in a full run' {
             $script:anydeskAdds = 0
             $script:returnEmptyTabl = $true
             $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -ExceptionDirectory $excDir `
-                -TablCapacity 10
+                -Target Tabl -TablCapacity 10
 
             $script:anydeskAdds | Should -Be 1
         }
     }
+}
 }

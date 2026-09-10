@@ -8,6 +8,9 @@ BeforeAll {
     $missingDir  = Join-Path $fixtureRoot 'missing-source'
 }
 
+Describe 'PreventKit target seams' {
+    BeforeEach { . (Join-Path $PSScriptRoot '_PreventKitTargetSeams.ps1') }
+
 Describe 'PreventKit last known good snapshot persistence' {
 
     It 'persists a last known good snapshot on successful retrieval and validation' {
@@ -67,4 +70,5 @@ Describe 'PreventKit last known good snapshot persistence' {
         $text | Should -Match 'last known good'
         $text | Should -Match ([regex]::Escape('*.anydesk.com'))
     }
+}
 }

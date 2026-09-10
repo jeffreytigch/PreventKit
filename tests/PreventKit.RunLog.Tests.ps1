@@ -7,12 +7,15 @@ BeforeAll {
     $dirtyDir    = Join-Path $fixtureRoot 'dirty'
 }
 
+Describe 'PreventKit target seams' {
+    BeforeEach { . (Join-Path $PSScriptRoot '_PreventKitTargetSeams.ps1') }
+
 Describe 'PreventKit run log' {
 
     It 'a Run writes a log entry with source fingerprints and exceptions applied' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         InModuleScope PreventKit -Parameters @{ logDir = $logDir; cleanDir = $cleanDir } {
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -ExceptionKey @('domain:GetScreen.me')
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -Target Tabl -ExceptionKey @('domain:GetScreen.me')
 
             $entries = @(Get-PreventKitRunLog -LogDirectory $logDir)
 
@@ -21,7 +24,7 @@ Describe 'PreventKit run log' {
             @($entries[0].SourceFingerprints).Count | Should -Be 1
             $entries[0].SourceFingerprints[0].CatalogueName | Should -Be 'lolrmm'
             $entries[0].SourceFingerprints[0].ContentHash | Should -Match '^[0-9a-f]{64}$'
-            @($entries[0].TargetOutcomes).Count | Should -Be 0
+            @($entries[0].TargetOutcomes).Count | Should -Be 1
         }
     }
 
@@ -39,7 +42,7 @@ Describe 'PreventKit run log' {
             Mock Add-TablManagedEntry { return $Values }
             Mock Remove-TablManagedEntry { }
 
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 10
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -Target Tabl -TablCapacity 10
 
             $entries = @(Get-PreventKitRunLog -LogDirectory $logDir)
             $entries[0].TargetOutcomes.Count | Should -Be 1
@@ -74,7 +77,7 @@ Describe 'PreventKit run log' {
             Mock Get-ExchangeOnlineSession { return [pscustomobject]@{ IsConnected = $true } }
             if (-not (Get-Command -Name Get-TenantAllowBlockListItems -ErrorAction SilentlyContinue)) { function Get-TenantAllowBlockListItems { [CmdletBinding()] param($ListType, [switch]$Block) } }
             Mock Get-TenantAllowBlockListItems { return @() }
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 0
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -Target Tabl -TablCapacity 0
 
             $entry = @(Get-PreventKitRunLog -LogDirectory $logDir)[0]
             $report = @(New-PreventKitRunReport -LogEntry $entry)
@@ -157,7 +160,7 @@ Describe 'PreventKit run log' {
             Mock Get-ExchangeOnlineSession { return [pscustomobject]@{ IsConnected = $true } }
             if (-not (Get-Command -Name Get-TenantAllowBlockListItems -ErrorAction SilentlyContinue)) { function Get-TenantAllowBlockListItems { [CmdletBinding()] param($ListType, [switch]$Block) } }
             Mock Get-TenantAllowBlockListItems { return @() }
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 0
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -Target Tabl -TablCapacity 0
 
             $entries = @(Get-PreventKitRunLog -LogDirectory $logDir)
 
@@ -199,4 +202,5 @@ Describe 'PreventKit exported run-log helpers' {
         $module.ExportedFunctions.Keys | Should -Contain 'Get-PreventKitRunLog'
         $module.ExportedFunctions.Keys | Should -Contain 'New-PreventKitRunReport'
     }
+}
 }

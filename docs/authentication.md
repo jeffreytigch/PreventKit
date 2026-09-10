@@ -5,7 +5,7 @@ authentication:
 
 - **Custom Network Indicators (CNI)** calls the Microsoft Defender for Endpoint
   API at `api.security.microsoft.com`. Every request carries an
-  `Authorization: Bearer <token>` header. Selecting CNI (via `-CniCapacity`)
+  `Authorization: Bearer <token>` header. Selecting CNI (via `-Target Cni`)
   automatically configures the target: the Run uses a caller-supplied
   `-CniToken` when provided, otherwise it acquires one from the signed-in
   Azure CLI session (`az account get-access-token --resource
@@ -95,7 +95,7 @@ Acquire the token with [Microsoft Authentication Library
 az login --tenant 'your-tenant-id'
 $token = (az account get-access-token --resource 'https://api.securitycenter.microsoft.com' | ConvertFrom-Json).accessToken
 
-Invoke-PreventKitRun -CatalogueDirectory ./catalogues -CniCapacity 15000 -CniToken $token
+Invoke-PreventKitRun -CatalogueDirectory ./catalogues -Target Cni -CniToken $token
 ```
 
 The interactive flow prompts in a browser, so it is not suitable for unattended
@@ -175,7 +175,7 @@ $authResponse = Invoke-RestMethod -Method Post `
     -Body $authBody
 $token = $authResponse.access_token
 
-Invoke-PreventKitRun -CatalogueDirectory ./catalogues -CniCapacity 15000 -CniToken $token
+Invoke-PreventKitRun -CatalogueDirectory ./catalogues -Target Cni -CniToken $token
 ```
 
 Keep the passphrase-protected private key out of the repository. For a
@@ -205,7 +205,7 @@ $token = (Invoke-RestMethod -Method Get -Headers @{
     Metadata = 'true'
 } -Uri 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fapi.securitycenter.microsoft.com').access_token
 
-Invoke-PreventKitRun -CatalogueDirectory ./catalogues -CniCapacity 15000 -CniToken $token
+Invoke-PreventKitRun -CatalogueDirectory ./catalogues -Target Cni -CniToken $token
 ```
 
 If the Run does not run on an Azure resource, use the client certificate flow
@@ -231,4 +231,4 @@ CLI unavailable or not signed in) fails before any request is sent.
 
 For the Tenant Allow/Block List target, authentication is separate:
 connect an Exchange Online session (`Connect-ExchangeOnline`) before the Run,
-then pass `-TablCapacity` as usual.
+then select TABL with `-Target Tabl` (optionally with `-TablCapacity`).

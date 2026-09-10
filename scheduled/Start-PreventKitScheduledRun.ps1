@@ -46,12 +46,17 @@ param(
     [string]$ExceptionDirectory,
 
     [Parameter()]
-    [ValidateRange(-1, [int]::MaxValue)]
-    [int]$TablCapacity = -1,
+    [ValidateSet('Tabl', 'Cni')]
+    [ValidateNotNullOrEmpty()]
+    [string[]]$Target = @('Tabl', 'Cni'),
 
     [Parameter()]
-    [ValidateRange(-1, [int]::MaxValue)]
-    [int]$CniCapacity = -1,
+    [ValidateRange(0, [int]::MaxValue)]
+    [Nullable[int]]$TablCapacity,
+
+    [Parameter()]
+    [ValidateRange(0, [int]::MaxValue)]
+    [Nullable[int]]$CniCapacity,
 
     [Parameter()]
     [string]$CniToken
@@ -71,8 +76,18 @@ $runParameters = @{
     CatalogueDirectory = $CatalogueDirectory
     StateDirectory     = $StateDirectory
     LogDirectory       = $LogDirectory
-    TablCapacity       = $TablCapacity
-    CniCapacity        = $CniCapacity
+}
+
+if ($PSBoundParameters.ContainsKey('Target')) {
+    $runParameters.Target = $Target
+}
+
+if ($null -ne $TablCapacity) {
+    $runParameters.TablCapacity = [int]$TablCapacity
+}
+
+if ($null -ne $CniCapacity) {
+    $runParameters.CniCapacity = [int]$CniCapacity
 }
 
 if (-not [string]::IsNullOrWhiteSpace($CniToken)) {

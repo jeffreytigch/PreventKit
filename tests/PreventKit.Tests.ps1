@@ -10,6 +10,9 @@ BeforeAll {
     $multiDir    = Join-Path $fixtureRoot 'multi'
 }
 
+Describe 'PreventKit target seams' {
+    BeforeEach { . (Join-Path $PSScriptRoot '_PreventKitTargetSeams.ps1') }
+
 Describe 'PreventKit catalogue retrieval and validation' {
 
     It 'produces a snapshot for an enabled lolrmm declaration without touching any enforcement target' {
@@ -236,7 +239,7 @@ Describe 'PreventKit CNI Run authentication' {
 
             $errorMessage = $null
             try {
-                Invoke-PreventKitRun -CatalogueDirectory $script:fixtureDir -CniCapacity 10 -ErrorAction Stop
+                Invoke-PreventKitRun -CatalogueDirectory $script:fixtureDir -Target Cni -CniCapacity 10 -ErrorAction Stop
             }
             catch {
                 $errorMessage = $_.Exception.Message
@@ -256,7 +259,7 @@ Describe 'PreventKit CNI Run authentication' {
                 return @()
             }
 
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -CniCapacity 10 `
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -Target Cni -CniCapacity 10 `
                 -CniToken 'test-token'
 
             $script:receivedToken | Should -Be 'test-token'
@@ -304,4 +307,5 @@ Describe 'PreventKit authentication documentation' {
         $text | Should -Match 'manual'
         $text | Should -Match 'supplied by the caller'
     }
+}
 }

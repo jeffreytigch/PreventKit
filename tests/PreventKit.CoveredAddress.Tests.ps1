@@ -6,6 +6,9 @@ BeforeAll {
     $crossCoveredDir = Join-Path $fixtureRoot 'cross-covered'
 }
 
+Describe 'PreventKit target seams' {
+    BeforeEach { . (Join-Path $PSScriptRoot '_PreventKitTargetSeams.ps1') }
+
 Describe 'PreventKit shared covered-address classifier' {
 
     It 'classifies a candidate whose normalized tail ends in a wildcard root as covered' {
@@ -185,4 +188,5 @@ Describe 'PreventKit covering is scoped to a catalogue source' {
         @($other.Covered).Count | Should -Be 0
         @($other.Unrepresentable | Where-Object { $_.Value -eq 'relay-[a-f0-9]{8}.net.anydesk.com:443' }).Count | Should -Be 1
     }
+}
 }

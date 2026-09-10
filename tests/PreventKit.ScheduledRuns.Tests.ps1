@@ -7,6 +7,9 @@ BeforeAll {
     $scheduledScript = Join-Path $PSScriptRoot '..' 'scheduled' 'Start-PreventKitScheduledRun.ps1'
 }
 
+Describe 'PreventKit target seams' {
+    BeforeEach { . (Join-Path $PSScriptRoot '_PreventKitTargetSeams.ps1') }
+
 Describe 'PreventKit scheduled Run wrapper' {
 
     It 'calls the same Run engine as a manual Run' {
@@ -117,7 +120,7 @@ Describe 'PreventKit scheduled Run wrapper' {
             Mock Get-ExchangeOnlineSession { return [pscustomobject]@{ IsConnected = $true } }
             if (-not (Get-Command -Name Get-TenantAllowBlockListItems -ErrorAction SilentlyContinue)) { function Get-TenantAllowBlockListItems { [CmdletBinding()] param($ListType, [switch]$Block) } }
             Mock Get-TenantAllowBlockListItems { return @() }
-            $exitCode = Start-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -TablCapacity 0
+            $exitCode = Start-PreventKitRun -CatalogueDirectory $cleanDir -LogDirectory $logDir -Target Tabl -TablCapacity 0
 
             $exitCode | Should -Be 0
             $entries = @(Get-PreventKitRunLog -LogDirectory $logDir)
@@ -236,15 +239,31 @@ Describe 'PreventKit scheduled wrapper script' {
         $scheduledScript | Should -Exist
     }
 
-    It 'exits 0 after a successful scheduled Run' {
+    It 'exits 0 after a scheduled Run completes with no writes' {
         $logDir = Join-Path $TestDrive ([guid]::NewGuid().Guid)
         $stateDir = Join-Path $TestDrive 'state'
+        $bootstrap = Join-Path $TestDrive 'bootstrap.ps1'
 
-        & pwsh -NoProfile -File $scheduledScript -CatalogueDirectory $cleanDir `
-            -StateDirectory $stateDir -LogDirectory $logDir
+        # The engine reconciles both destinations by default, so the script
+        # under test needs target seams. Run the wrapper in its own process
+        # with a connected-session global and an empty TABL read, then abort
+        # TABL on a zero capacity preflight so no write is attempted.
+        @"
+`$global:ExchangeOnlineSession = [pscustomobject]@{ IsConnected = `$true }
+function global:Get-TenantAllowBlockListItems { [CmdletBinding()] param(`$ListType, [switch]`$Block) return @() }
+& '$scheduledScript' -CatalogueDirectory '$cleanDir' -StateDirectory '$stateDir' -LogDirectory '$logDir' -Target Tabl -TablCapacity 0
+"@ | Set-Content -LiteralPath $bootstrap -Encoding utf8
+
+        & pwsh -NoProfile -File $bootstrap
 
         $LASTEXITCODE | Should -Be 0
         @(Get-ChildItem -LiteralPath $logDir -Filter '*.run.json').Count | Should -Be 1
+
+        # -Target Tabl reached the engine: CNI is recorded as not selected.
+        $entry = @(Get-PreventKitRunLog -LogDirectory $logDir)[0]
+        $cniConfig = $entry.TargetConfigurations | Where-Object { $_.Target -eq 'Cni' }
+        $cniConfig.Status | Should -Be 'Skipped'
+        $cniConfig.SelectionReason | Should -Be 'Not selected'
     }
 
     It 'exits non-zero after a failing scheduled Run' {
@@ -258,4 +277,5 @@ Describe 'PreventKit scheduled wrapper script' {
         $LASTEXITCODE | Should -Be 1
         @(Get-ChildItem -LiteralPath $logDir -Filter '*.run.json').Count | Should -Be 1
     }
+}
 }

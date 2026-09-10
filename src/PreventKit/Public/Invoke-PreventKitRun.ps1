@@ -14,11 +14,14 @@ failure) and still completes. Invocation exceptions supplied through
 ExceptionKey are managed-only: matched services and blockable addresses drop
 out of the desired state.
 
-When target capacities are supplied (TablCapacity / CniCapacity), the Run
-also reconciles those enforcement targets to the desired state and records
-the reconciliation outcomes. When LogDirectory is supplied, each Run writes a
-durable run log entry capturing source fingerprints, exceptions applied, and
-per-target outcomes.
+By default the Run reconciles both enforcement targets, TABL and CNI, to the
+desired state using the plan-default capacities (TABL 1000, CNI 15000). The
+Target parameter selects which destinations are reconciled; TablCapacity and
+CniCapacity are preflight-limit overrides for a selected destination only.
+When LogDirectory is supplied, each Run writes a durable run log entry
+capturing source fingerprints, exceptions applied, per-target outcomes, and
+each destination's configuration (unselected destinations are recorded as
+skipped with a 'Not selected' reason).
 
 With -WhatIf the run computes the desired state (after exceptions) and prints a
 readable WhatIf run report showing the desired state, what was suppressed, and
@@ -44,20 +47,26 @@ Directory where last known good catalogue snapshots are persisted.
 .PARAMETER LogDirectory
 Directory where run log entries are written.
 
+.PARAMETER Target
+The enforcement targets this Run reconciles, chosen from 'Tabl' and 'Cni'.
+Defaults to both. A Run always reconciles at least one destination; an empty
+selection is rejected.
+
 .PARAMETER TablCapacity
-When supplied, reconcile the Tenant Allow/Block List to the desired state.
-Current entries are always read live from the tenant via
-Get-TenantAllowBlockListItems -ListType Url -Block before reconciliation
-(manual and auto paths alike); a failed read surfaces a Failed run before any
-write. When -TablAuto is specified, this parameter is ignored and the default
-P1 capacity (5000) is used.
+Optional preflight-limit override for the Tenant Allow/Block List when TABL is
+selected; defaults to the plan limit of 1000. Current entries are always read
+live from the tenant via Get-TenantAllowBlockListItems -ListType Url -Block
+before reconciliation; a failed read surfaces a Failed run before any write.
+Supplying this while TABL is not selected is an error.
 
 .PARAMETER CniCapacity
-When supplied, reconcile Custom Network Indicators to the desired state.
-Selecting CNI automatically acquires a token (using -CniToken when supplied,
-otherwise from the signed-in Azure CLI session), verifies the caller can read
-and write CNI, and reads the current indicator state before reconciliation; a
-missing token or failed read surfaces a Failed run before any request.
+Optional preflight-limit override for Custom Network Indicators when CNI is
+selected; defaults to the plan limit of 15000. Selecting CNI automatically
+acquires a token (using -CniToken when supplied, otherwise from the signed-in
+Azure CLI session), verifies the caller can read and write CNI, and reads the
+current indicator state before reconciliation; a missing token or failed read
+surfaces a Failed run before any request. Supplying this while CNI is not
+selected is an error.
 
 .PARAMETER CniToken
 Optional access token for the MDE Custom Network Indicators API. When CNI is
@@ -65,16 +74,6 @@ selected and no token is supplied, one is acquired automatically from the
 signed-in Azure CLI session. Supplying a token skips acquisition but
 verification and the current-entry read still happen. Any acquisition method
 works (interactive, client certificate, or managed identity).
-
-.PARAMETER TablAuto
-When specified, automatically configure the TABL target: use the default
-Defender for Office 365 Plan 1 capacity (5000), verify an active Exchange
-Online session, and read current URL block entries from the tenant. No manual
-TablCapacity required.
-
-.PARAMETER TablCapacityP1
-When specified with -TablCapacity (without -TablAuto), use the Defender for
-Office 365 Plan 1 default capacity (5000) instead of the supplied value.
 
 .PARAMETER TargetOutcome
 Output variable to receive per-target configuration and reconciliation
@@ -85,16 +84,13 @@ details about what was selected, validated, reconciled, skipped, or unavailable.
 Invoke-PreventKitRun -CatalogueDirectory .\catalogues -StateDirectory .\state -LogDirectory .\logs
 
 .EXAMPLE
+Invoke-PreventKitRun -CatalogueDirectory .\catalogues -Target Tabl -TablCapacity 1000 -LogDirectory .\logs
+
+.EXAMPLE
 Invoke-PreventKitRun -CatalogueDirectory .\catalogues -ExceptionKey 'service:lolrmm/AnyDesk' -WhatIf
 
 .EXAMPLE
 Invoke-PreventKitRun -CatalogueDirectory .\tests\fixtures\clean
-
-.EXAMPLE
-Invoke-PreventKitRun -CatalogueDirectory .\catalogues -TablAuto -LogDirectory .\logs
-
-.EXAMPLE
-Invoke-PreventKitRun -CatalogueDirectory .\catalogues -TablCapacity 5000 -TablCapacityP1 -LogDirectory .\logs
 
 .OUTPUTS
 System.Management.Automation.PSCustomObject, one per enabled catalogue
@@ -122,21 +118,20 @@ function Invoke-PreventKitRun {
         [string]$LogDirectory = "./logs",
 
         [Parameter()]
-        [ValidateRange(-1, [int]::MaxValue)]
-        [int]$TablCapacity = -1,
+        [ValidateSet('Tabl', 'Cni')]
+        [ValidateNotNullOrEmpty()]
+        [string[]]$Target = @('Tabl', 'Cni'),
 
         [Parameter()]
-        [ValidateRange(-1, [int]::MaxValue)]
-        [int]$CniCapacity = -1,
+        [ValidateRange(0, [int]::MaxValue)]
+        [Nullable[int]]$TablCapacity,
+
+        [Parameter()]
+        [ValidateRange(0, [int]::MaxValue)]
+        [Nullable[int]]$CniCapacity,
 
         [Parameter()]
         [string]$CniToken,
-
-        [Parameter()]
-        [switch]$TablAuto,
-
-        [Parameter()]
-        [switch]$TablCapacityP1,
 
         [Parameter()]
         [Alias('TargetOutcome')]
@@ -153,7 +148,28 @@ function Invoke-PreventKitRun {
     $targetOutcomes  = @()
     $targetConfigurations = @()
 
+    $planDefaultTablCapacity = 1000
+    $planDefaultCniCapacity  = 15000
+
     try {
+        $selectedTargets = @($Target | Select-Object -Unique)
+        if ($selectedTargets.Count -eq 0) {
+            throw 'At least one enforcement target must be selected with -Target.'
+        }
+
+        $tablSelected = $selectedTargets -contains 'Tabl'
+        $cniSelected  = $selectedTargets -contains 'Cni'
+
+        if (-not $tablSelected -and $null -ne $TablCapacity) {
+            throw "A TABL capacity was supplied but TABL is not selected. Add 'Tabl' to -Target or omit -TablCapacity."
+        }
+        if (-not $cniSelected -and $null -ne $CniCapacity) {
+            throw "A CNI capacity was supplied but CNI is not selected. Add 'Cni' to -Target or omit -CniCapacity."
+        }
+
+        $effectiveTablCapacity = if ($null -ne $TablCapacity) { [int]$TablCapacity } else { $planDefaultTablCapacity }
+        $effectiveCniCapacity  = if ($null -ne $CniCapacity) { [int]$CniCapacity } else { $planDefaultCniCapacity }
+
         foreach ($key in @($ExceptionKey)) {
             if (-not [string]::IsNullOrWhiteSpace($key) -and $key -notlike 'service:*' -and $key -notlike 'domain:*') {
                 Write-Warning "Ignoring exception key '$key': expected 'service:<serviceId>' or 'domain:<value>'."
@@ -199,37 +215,24 @@ function Invoke-PreventKitRun {
             return
         }
 
-        # Resolve TABL configuration
+        # Resolve TABL configuration: TABL always reads live state before
+        # diffing; a failed read throws before any write.
         $tablConfig = $null
-        if ($TablAuto) {
-            $tablConfig = Get-AutoTablConfiguration
-            $targetConfigurations += @{
-                Target              = 'Tabl'
-                ConfigurationMode   = 'Auto'
-                Capacity            = $tablConfig.Capacity
-                Status              = 'Selected'
-                ValidationStatus    = 'Validated'
-                SelectionReason     = 'Default P1 capacity with auto-detected Exchange Online session'
-            }
-        }
-        elseif ($TablCapacity -ge 0) {
-            $effectiveCapacity = if ($TablCapacityP1) { 5000 } else { $TablCapacity }
-            # Always read live state at the enforcement target before diffing
-            # (manual and auto paths alike); a failed read throws before any write.
-            $liveConfig = Get-AutoTablConfiguration -Capacity $effectiveCapacity
+        if ($tablSelected) {
+            $liveConfig = Get-AutoTablConfiguration -Capacity $effectiveTablCapacity
             $tablConfig = [pscustomobject]@{
                 Capacity          = $liveConfig.Capacity
                 CurrentEntries    = $liveConfig.CurrentEntries
                 SessionVerified   = $true
-                ConfigurationMode = 'Manual'
+                ConfigurationMode = 'Auto'
             }
             $targetConfigurations += @{
                 Target              = 'Tabl'
-                ConfigurationMode   = 'Manual'
-                Capacity            = $effectiveCapacity
+                ConfigurationMode   = 'Auto'
+                Capacity            = $effectiveTablCapacity
                 Status              = 'Selected'
                 ValidationStatus    = 'Pending'
-                SelectionReason     = if ($TablCapacityP1) { 'Manual capacity with P1 default' } else { 'Manual capacity' }
+                SelectionReason     = if ($null -ne $TablCapacity) { 'TABL selected with a caller-supplied capacity override' } else { 'TABL selected with the plan-default capacity' }
             }
         }
         else {
@@ -239,7 +242,7 @@ function Invoke-PreventKitRun {
                 Capacity            = $null
                 Status              = 'Skipped'
                 ValidationStatus    = 'NotConfigured'
-                SelectionReason     = 'No TABL capacity specified'
+                SelectionReason     = 'Not selected'
             }
         }
 
@@ -247,15 +250,15 @@ function Invoke-PreventKitRun {
         # (caller-supplied -CniToken as override, otherwise from Azure CLI),
         # verifies authorization, and reads the current indicator state.
         $cniConfig = $null
-        if ($CniCapacity -ge 0) {
-            $cniConfig = Get-AutoCniConfiguration -Capacity $CniCapacity -Token $CniToken
+        if ($cniSelected) {
+            $cniConfig = Get-AutoCniConfiguration -Capacity $effectiveCniCapacity -Token $CniToken
             $targetConfigurations += @{
                 Target              = 'Cni'
                 ConfigurationMode   = 'Auto'
                 Capacity            = $cniConfig.Capacity
                 Status              = 'Selected'
                 ValidationStatus    = 'Validated'
-                SelectionReason     = if ([string]::IsNullOrWhiteSpace($CniToken)) { 'Auto-configured via Azure CLI token' } else { 'Auto-configured with caller-supplied token override' }
+                SelectionReason     = if ($null -ne $CniCapacity -and -not [string]::IsNullOrWhiteSpace($CniToken)) { 'CNI selected with caller-supplied capacity and token overrides' } elseif ($null -ne $CniCapacity) { 'CNI selected with a caller-supplied capacity override' } elseif (-not [string]::IsNullOrWhiteSpace($CniToken)) { 'CNI selected with a caller-supplied token override' } else { 'CNI selected with plan defaults; token acquired automatically' }
             }
         }
         else {
@@ -265,7 +268,7 @@ function Invoke-PreventKitRun {
                 Capacity            = $null
                 Status              = 'Skipped'
                 ValidationStatus    = 'NotConfigured'
-                SelectionReason     = 'No CNI capacity specified'
+                SelectionReason     = 'Not selected'
             }
         }
 

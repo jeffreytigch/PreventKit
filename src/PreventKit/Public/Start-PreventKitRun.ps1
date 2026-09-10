@@ -29,33 +29,27 @@ Directory where last known good catalogue snapshots are persisted.
 .PARAMETER LogDirectory
 Directory where run log entries are written.
 
+.PARAMETER Target
+The enforcement targets this Run reconciles, chosen from 'Tabl' and 'Cni'.
+When omitted, the Run engine's default (both destinations) applies.
+
 .PARAMETER TablCapacity
-When supplied, reconcile the Tenant Allow/Block List to the desired state.
-Current entries are always read live from the tenant before reconciliation.
-When -TablAuto is specified, this parameter is ignored and the default P1
-capacity (5000) is used.
+Optional preflight-limit override for the Tenant Allow/Block List when TABL is
+selected. Current entries are always read live from the tenant before
+reconciliation. When omitted, the engine's plan default (1000) applies.
 
 .PARAMETER CniCapacity
-When supplied, reconcile Custom Network Indicators to the desired state.
-Selecting CNI automatically acquires a token (using -CniToken when supplied,
-otherwise from the signed-in Azure CLI session), verifies authorization, and
-reads the current indicator state before reconciliation.
+Optional preflight-limit override for Custom Network Indicators when CNI is
+selected. Selecting CNI automatically acquires a token (using -CniToken when
+supplied, otherwise from the signed-in Azure CLI session), verifies
+authorization, and reads the current indicator state before reconciliation.
+When omitted, the engine's plan default (15000) applies.
 
 .PARAMETER CniToken
 Optional access token for the MDE Custom Network Indicators API. When CNI is
 selected and no token is supplied, one is acquired automatically from the
 signed-in Azure CLI session. Supplying a token skips acquisition but
 verification and the current-entry read still happen.
-
-.PARAMETER TablAuto
-When specified, automatically configure the TABL target: use the default
-Defender for Office 365 Plan 1 capacity (5000), verify an active Exchange
-Online session, and read current URL block entries from the tenant. No manual
-TablCapacity required.
-
-.PARAMETER TablCapacityP1
-When specified with -TablCapacity (without -TablAuto), use the Defender for
-Office 365 Plan 1 default capacity (5000) instead of the supplied value.
 
 .EXAMPLE
 Start-PreventKitRun -CatalogueDirectory .\catalogues -StateDirectory .\state -LogDirectory .\logs
@@ -64,7 +58,7 @@ Start-PreventKitRun -CatalogueDirectory .\catalogues -StateDirectory .\state -Lo
 Start-PreventKitRun -CatalogueDirectory .\catalogues -LogDirectory .\logs; if ($LASTEXITCODE) { throw }
 
 .EXAMPLE
-Start-PreventKitRun -CatalogueDirectory .\catalogues -TablAuto -LogDirectory .\logs
+Start-PreventKitRun -CatalogueDirectory .\catalogues -Target Tabl -TablCapacity 1000 -LogDirectory .\logs
 
 .OUTPUTS
 System.Int32, the process exit code: 0 on success, 1 on failure.
@@ -90,21 +84,20 @@ function Start-PreventKitRun {
         [string]$LogDirectory,
 
         [Parameter()]
-        [ValidateRange(-1, [int]::MaxValue)]
-        [int]$TablCapacity = -1,
+        [ValidateSet('Tabl', 'Cni')]
+        [ValidateNotNullOrEmpty()]
+        [string[]]$Target = @('Tabl', 'Cni'),
 
         [Parameter()]
-        [ValidateRange(-1, [int]::MaxValue)]
-        [int]$CniCapacity = -1,
+        [ValidateRange(0, [int]::MaxValue)]
+        [Nullable[int]]$TablCapacity,
 
         [Parameter()]
-        [string]$CniToken,
+        [ValidateRange(0, [int]::MaxValue)]
+        [Nullable[int]]$CniCapacity,
 
         [Parameter()]
-        [switch]$TablAuto,
-
-        [Parameter()]
-        [switch]$TablCapacityP1
+        [string]$CniToken
     )
 
     $globalExceptionKey = @()
@@ -120,14 +113,23 @@ function Start-PreventKitRun {
 
     $script:preventKitRunLogEntryWritten = $false
 
+    # Forward -Target and any capacity override only when the caller supplied
+    # them; the Run engine owns the default destination selection and the
+    # plan-default capacities.
+    $runParameters = @{
+        CatalogueDirectory = $CatalogueDirectory
+        ExceptionKey       = $ExceptionKey
+        ExceptionDirectory = $ExceptionDirectory
+        StateDirectory     = $StateDirectory
+        LogDirectory       = $LogDirectory
+    }
+    if ($PSBoundParameters.ContainsKey('Target')) { $runParameters.Target = $Target }
+    if ($null -ne $TablCapacity) { $runParameters.TablCapacity = [int]$TablCapacity }
+    if ($null -ne $CniCapacity) { $runParameters.CniCapacity = [int]$CniCapacity }
+    if (-not [string]::IsNullOrWhiteSpace($CniToken)) { $runParameters.CniToken = $CniToken }
+
     try {
-        $null = Invoke-PreventKitRun -CatalogueDirectory $CatalogueDirectory `
-            -ExceptionKey $ExceptionKey -ExceptionDirectory $ExceptionDirectory `
-            -StateDirectory $StateDirectory -LogDirectory $LogDirectory `
-            -TablCapacity $TablCapacity -CniCapacity $CniCapacity `
-            -CniToken $CniToken `
-            -TablAuto:$TablAuto -TablCapacityP1:$TablCapacityP1 `
-            -ErrorAction Stop
+        $null = Invoke-PreventKitRun @runParameters -ErrorAction Stop
 
         return 0
     }

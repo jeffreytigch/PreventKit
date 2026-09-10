@@ -6,6 +6,9 @@ BeforeAll {
     $cleanDir    = Join-Path $fixtureRoot 'clean'
 }
 
+Describe 'PreventKit target seams' {
+    BeforeEach { . (Join-Path $PSScriptRoot '_PreventKitTargetSeams.ps1') }
+
 Describe 'PreventKit invocation exception key matching' {
 
     BeforeAll {
@@ -121,7 +124,7 @@ Describe 'PreventKit invocation exceptions are managed-only in reconciliation' {
             Mock Add-TablManagedEntry { return $Values }
             Mock Remove-TablManagedEntry { }
 
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -TablCapacity 10 `
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -Target Tabl -TablCapacity 10 `
                 -ExceptionKey @('service:lolrmm/AnyDesk')
 
             Assert-MockCalled Add-TablManagedEntry -Times 0 -Exactly -ParameterFilter {
@@ -148,7 +151,7 @@ Describe 'PreventKit invocation exceptions are managed-only in reconciliation' {
             Mock Add-TablManagedEntry { return $Values }
             Mock Remove-TablManagedEntry { }
 
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -TablCapacity 10 `
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -Target Tabl -TablCapacity 10 `
                 -ExceptionKey @('service:lolrmm/AnyDesk')
 
             Assert-MockCalled Add-TablManagedEntry -Times 0 -Exactly -ParameterFilter {
@@ -171,7 +174,7 @@ Describe 'PreventKit invocation exceptions are managed-only in reconciliation' {
             Mock Add-CniManagedEntry { return $Mappings }
             Mock Remove-CniManagedEntry { }
 
-            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -CniCapacity 10 `
+            $null = Invoke-PreventKitRun -CatalogueDirectory $cleanDir -Target Cni -CniCapacity 10 `
                 -ExceptionKey @('service:lolrmm/AnyDesk') -CniToken 'test-token'
 
             Assert-MockCalled Add-CniManagedEntry -Times 0 -Exactly -ParameterFilter {
@@ -185,4 +188,5 @@ Describe 'PreventKit invocation exceptions are managed-only in reconciliation' {
             }
         }
     }
+}
 }

@@ -16,7 +16,7 @@ function Get-AutoTablConfiguration {
     param(
         [Parameter()]
         [ValidateRange(0, [int]::MaxValue)]
-        [int]$Capacity = 5000
+        [int]$Capacity = 1000
     )
 
     # Verify Exchange Online session is connected

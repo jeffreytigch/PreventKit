@@ -7,6 +7,9 @@ BeforeAll {
     $denyDir     = Join-Path $fixtureRoot 'mapping' 'deny'
 }
 
+Describe 'PreventKit target seams' {
+    BeforeEach { . (Join-Path $PSScriptRoot '_PreventKitTargetSeams.ps1') }
+
 Describe 'PreventKit CNI target mapping' {
 
     It 'maps a bare domain as a non-broadened DomainName indicator' {
@@ -292,3 +295,5 @@ Describe 'PreventKit CNI full-run mapping' {
         $text | Should -Match 'Unmappable: 1'
     }
 }
+}
+
