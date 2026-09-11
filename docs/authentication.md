@@ -18,9 +18,24 @@ authentication:
   (`Connect-ExchangeOnline`) in the same PowerShell session before the Run
   starts. There is no token parameter for TABL.
 
-This page covers the CNI token: how to register an app in Microsoft Entra ID,
-what permissions each flow needs, and how to acquire a token with the
-interactive, client certificate, and managed identity flows.
+This page covers both targets: how to register an app in Microsoft Entra ID and
+acquire a CNI token with the interactive, client certificate, and managed
+identity flows, and how to prepare Exchange Online for a TABL Run.
+
+## Least privilege at a glance
+
+| Target | Interactive | App registration / managed identity |
+| --- | --- | --- |
+| CNI | Delegated `Ti.ReadWrite`, plus built-in **Security Administrator** (or a Defender XDR RBAC role with **Detection tuning → Manage**) | Application `Ti.ReadWrite.All` (no directory role) |
+| TABL | Exchange **Security Operator** role group, or built-in **Exchange Administrator** | Office 365 Exchange Online `Exchange.ManageAsApp` plus a supported Microsoft Entra role |
+
+Setup references:
+
+- CNI app registration: [Create an app to access Microsoft Defender for Endpoint without a user](https://learn.microsoft.com/defender-endpoint/api/exposed-apis-create-app-webapp) — application context also supports a managed identity or certificate credential.
+- CNI roles: [Assign Microsoft Entra roles](https://learn.microsoft.com/entra/identity/role-based-access-control/manage-roles-portal) and [Microsoft Defender unified RBAC](https://learn.microsoft.com/defender-xdr/manage-rbac).
+- TABL app-only: [App-only authentication for unattended scripts in Exchange Online PowerShell](https://learn.microsoft.com/powershell/exchange/app-only-auth-powershell-v2).
+- TABL managed identity: [Use Azure managed identities to connect to Exchange Online PowerShell](https://learn.microsoft.com/powershell/exchange/connect-exo-powershell-managed-identity).
+- TABL role permissions: [Permissions in Exchange Online](https://learn.microsoft.com/exchange/permissions-exo/permissions-exo).
 
 ## The MDE Custom Network Indicators API
 
@@ -70,6 +85,15 @@ features** → **Custom network indicators**.
    `Ti.ReadWrite.All` application permission and the `Ti.ReadWrite` delegated
    permission both require tenant-wide admin consent.
 
+`Ti.ReadWrite.All` is the least-privileged application permission that supports
+every call PreventKit makes: the narrower `Ti.ReadWrite` application permission
+does not cover the import and batch-delete endpoints, and only exposes
+indicators the app itself created. For an app registration or managed identity,
+follow Microsoft's [application context setup](https://learn.microsoft.com/defender-endpoint/api/exposed-apis-create-app-webapp),
+which supports a managed identity or certificate credential. App-only access is
+granted entirely by this application permission, so do not attach a Microsoft
+Entra directory role to the CNI app or managed identity.
+
 ## Step 3 — Acquire a token
 
 When CNI is selected without `-CniToken`, PreventKit acquires a token
@@ -87,6 +111,13 @@ portal RBAC model, this is the **Indicators (manage)** permission under
 **Security operations**; in the unified RBAC model, **Detection tuning →
 Manage**). If the user can manage indicators in the portal, the same user can
 manage them through the API with the `Ti.ReadWrite` delegated scope.
+
+The user also needs access to Defender for Endpoint itself. The
+least-privileged built-in Microsoft Entra role with write access is **Security
+Administrator** (**Security Reader** is read-only). For tighter scoping, assign
+a [Microsoft Defender unified RBAC](https://learn.microsoft.com/defender-xdr/manage-rbac)
+role carrying **Detection tuning → Manage** instead of the broader Entra role.
+Grant the role with [Assign Microsoft Entra roles](https://learn.microsoft.com/entra/identity/role-based-access-control/manage-roles-portal).
 
 Acquire the token with [Microsoft Authentication Library
 (MSAL)](https://learn.microsoft.com/en-us/entra/msal/dotnet/) or the Azure CLI:
@@ -192,10 +223,10 @@ certificate — no secret or key to store and rotate.
 Whether the MDE API accepts a managed-identity token depends on the tenant's
 setup: the managed identity's service principal must hold the application
 permission the API checks (`Ti.ReadWrite.All` on the WindowsDefenderATP
-resource), which your tenant administrator grants. Microsoft's app-only API
-guidance lists managed identity as a supported credential alongside client
-certificates, but validate it against your tenant before relying on it for a
-scheduled Run.
+resource), which your tenant administrator grants. Microsoft's [application
+context guidance](https://learn.microsoft.com/defender-endpoint/api/exposed-apis-create-app-webapp)
+lists managed identity as a supported credential alongside client certificates,
+but validate it against your tenant before relying on it for a scheduled Run.
 
 To acquire the token with a managed identity from PowerShell running on the
 Azure resource:
@@ -229,6 +260,72 @@ scheduled wrapper accepts the same `-CniToken` parameter. A Run that selects
 Custom Network Indicators with no token available (no `-CniToken` and Azure
 CLI unavailable or not signed in) fails before any request is sent.
 
-For the Tenant Allow/Block List target, authentication is separate:
-connect an Exchange Online session (`Connect-ExchangeOnline`) before the Run,
-then select TABL with `-Target Tabl` (optionally with `-TablCapacity`).
+Automatic acquisition needs the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli)
+installed and signed in (`az login`, using `--tenant` in a multi-tenant
+environment). It acquires a fresh token for every Run. A token you supply
+yourself expires (typically within an hour), so for unattended Runs prefer the
+client certificate or managed identity flow, which acquires its token at Run
+time rather than caching one.
+
+## TABL authentication
+
+The Tenant Allow/Block List target writes through Exchange Online PowerShell.
+It has no token parameter: you prepare a session before the Run, in the same
+PowerShell session the Run uses.
+
+### Prerequisite: the ExchangeOnlineManagement module
+
+TABL depends on the first-party [`ExchangeOnlineManagement`](https://learn.microsoft.com/powershell/exchange/exchange-online-powershell-v2)
+module, which is not a dependency of PreventKit. Install it once:
+
+```powershell
+Install-Module ExchangeOnlineManagement -Scope CurrentUser
+```
+
+A Run that selects TABL verifies the session by calling
+`Get-TenantAllowBlockListItems` and writes with
+`New-TenantAllowBlockListItems` and `Remove-TenantAllowBlockListItems`, so the
+connected session must expose all three.
+
+### Interactive Runs
+
+Connect with an admin account before the Run:
+
+```powershell
+Connect-ExchangeOnline -UserPrincipalName admin@contoso.onmicrosoft.com
+Invoke-PreventKitRun -CatalogueDirectory ./catalogues -Target Tabl
+```
+
+The account needs permission to add and remove Tenant Allow/Block List entries.
+The most granular option is the Exchange **Security Operator** role group, which
+carries the **Tenant AllowBlockList Manager** role (assign it directly in the
+[Exchange admin center](https://admin.exchange.microsoft.com) under **Roles** >
+**Admin Roles**). If you prefer a built-in Microsoft Entra role, the
+least-privileged default is **Exchange Administrator**. Avoid Global
+Administrator. See [Permissions in Exchange Online](https://learn.microsoft.com/exchange/permissions-exo/permissions-exo).
+
+### Unattended Runs: app-only certificate or managed identity
+
+For scheduled Runs, connect the session as an app or managed identity instead of
+a person:
+
+```powershell
+# App-only certificate
+Connect-ExchangeOnline -CertificateThumbprint '<thumbprint>' -AppId '<client-id>' -Organization 'contoso.onmicrosoft.com'
+
+# Managed identity, from the Azure resource
+Connect-ExchangeOnline -ManagedIdentity -Organization 'contoso.onmicrosoft.com'
+```
+
+The app or managed identity needs:
+
+- the **Office 365 Exchange Online** > **`Exchange.ManageAsApp`** application
+  permission, granted tenant-wide admin consent. It is the only Exchange Online
+  PowerShell application permission, so it is the least-privileged permission
+  that works; and
+- a supported Microsoft Entra role assignment. The least-privileged default is
+  **Exchange Administrator**.
+
+Microsoft's setup guides cover both: [App-only authentication for unattended
+scripts](https://learn.microsoft.com/powershell/exchange/app-only-auth-powershell-v2)
+and [Use Azure managed identities to connect to Exchange Online PowerShell](https://learn.microsoft.com/powershell/exchange/connect-exo-powershell-managed-identity).

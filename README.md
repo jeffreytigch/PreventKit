@@ -18,47 +18,15 @@ Every Run is either a manual invocation or a scheduled invocation; both drive th
 flowchart LR
     A{Run} --> B[Retrieve and parse catalogue sources]
     Source1([LOLRMM]) -.- B
+    SourceN([Other sources]) -.- B
     B --> C[Apply exceptions]
     C --> D[Compute desired state]
     D --> E[Apply entries from catalogue sources to M365 services]
     Target1([Tenant Allow/Block List]) -.- E
     Target2([Custom Network Indicators]) -.- E
+    TargetN([Other destinations]) -.- E
     E --> F{Done}
 ```
-
-## Catalogues
-
-A **catalogue declaration** enables a block catalogue and sets its scope. Declarations live in `catalogues/` and match `*.catalog.psd1`:
-
-```powershell
-@{
-    Name    = 'lolrmm'
-    Enabled = $true
-    Adapter = 'LolRmmCsv'
-    Scope   = 'lolrmm'
-    Source  = 'https://lolrmm.io/api/rmm_domains.csv'
-}
-```
-
-| Field | Meaning |
-| --- | --- |
-| `Name` | Identifier for the catalogue, used in logs and reports. |
-| `Enabled` | Whether this declaration contributes to every Run. Disabled declarations are skipped. |
-| `Adapter` | The **source adapter** that parses the source's native format. |
-| `Scope` | Prefix applied to the service identifiers parsed from this source. |
-| `Source` | URL or local path the catalogue is read from. Approving the source is an operator responsibility. |
-
-Built-in adapters:
-
-| Adapter | Source format |
-| --- | --- |
-| `LolRmmCsv` | [lolrmm.io](https://lolrmm.io) RMM domains CSV |
-
-Notes:
-
-- A source that fails retrieval or validation is skipped in favour of its **last known good snapshot** when one exists; otherwise the Run still completes and records the failure.
-- Additional catalogues are registered with `Register-CatalogueAdapter`, which takes a scriptblock receiving `-Content` and `-Scope` and returning `Services` and `BlockableAddresses`.
-- To contribute a new catalogue, the source must present a natively ingestable format (CSV, JSON), and must come with a transformation script and tests. See [`docs/catalogues.md`](docs/catalogues.md).
 
 ## Install
 
@@ -82,9 +50,14 @@ The module declares no `RequiredModules` and is self-contained.
 
 ### Enforcement targets and capacity
 
-Two enforcement targets are supported: **CNI** — Custom Network Indicators, and **TABL** — Tenant Allow/Block List. A Run reconciles **both targets by default**, so no target argument is required. Use `-Target` to narrow a Run to one destination (`-Target Tabl` or `-Target Cni`); `-Target` accepts both values together and rejects an empty selection.
+The following enforcement targets (destinations) are implemented:
 
-Each destination has a **plan-default capacity**: TABL 1000 and CNI 15,000. The capacity is the preflight limit: the **capacity preflight** aborts a destination when the planned managed-entry count would exceed it, before any write. Supply `-TablCapacity` / `-CniCapacity` only to override the plan default for a destination that is selected; supplying a capacity for an unselected destination is an error.
+- **CNI** — Custom Network Indicators (Microsoft Defender for Endpoint)
+- **TABL** — Tenant Allow/Block List (Microsoft Defender for Office 365)
+
+A Run reconciles **both targets by default**, so no target argument is required. Use `-Target` to narrow a Run to one destination (`-Target Tabl` or `-Target Cni`); `-Target` accepts both values together and rejects an empty selection.
+
+Each destination assumes **Plan 1 capacity**: TABL 1000 and CNI 15,000. The capacity is the preflight limit: the **capacity preflight** aborts a destination when the planned managed-entry count would exceed it, before any write. Supply `-TablCapacity` / `-CniCapacity` only to override the plan default for a destination that is selected; supplying a capacity for an unselected destination is an error.
 
 | Target | Selected by | Licence | Block entry limit |
 | --- | --- | --- | --- |
@@ -104,9 +77,9 @@ Each destination authenticates its own connection:
 
 See [`docs/authentication.md`](docs/authentication.md) for Entra app registration and the interactive, client-certificate, and managed-identity token flows.
 
-### Run over the repository catalogues
+### Run
 
-A Run with no target arguments reconciles both destinations using the plan-default capacities:
+A Run with no target arguments reconciles both destinations using the Plan 1 capacities:
 
 ```powershell
 Invoke-PreventKitRun -CatalogueDirectory ./catalogues -StateDirectory ./state -LogDirectory ./logs
@@ -129,12 +102,23 @@ A **WhatIf run** computes and reports the desired state without modifying any en
 Invoke-PreventKitRun -CatalogueDirectory ./catalogues -WhatIf
 ```
 
-Supplying an explicit CNI token (interactive, client certificate, or managed identity) for a CNI-only Run:
+For an explicit CNI token (interactive, client certificate, or managed identity), see [`docs/authentication.md`](docs/authentication.md).
 
-```powershell
-$token = (az account get-access-token --resource 'https://api.securitycenter.microsoft.com' | ConvertFrom-Json).accessToken
-Invoke-PreventKitRun -CatalogueDirectory ./catalogues -Target Cni -CniToken $token
-```
+### Catalogues
+
+A **catalogue declaration** enables a block catalogue and sets its scope. Declarations live in `catalogues/`.
+
+Built-in adapters:
+
+| Adapter | Source format |
+| --- | --- |
+| `LolRmmCsv` | [lolrmm.io](https://lolrmm.io) RMM domains CSV |
+
+Notes:
+
+- A source that fails retrieval or validation is skipped in favour of its **last known good snapshot** when one exists; otherwise the Run still completes and records the failure.
+- Additional catalogues are registered with `Register-CatalogueAdapter`, which takes a scriptblock receiving `-Content` and `-Scope` and returning `Services` and `BlockableAddresses`.
+- To contribute a new catalogue, the source must present a natively ingestable format (CSV, JSON), and must come with a transformation script and tests. See [`docs/catalogues.md`](docs/catalogues.md).
 
 ### Exceptions
 
@@ -211,3 +195,11 @@ New-PreventKitIntegrityBaseline -OutputPath ./preventkit-baseline.json
 ```
 
 See [`docs/supply-chain-security.md`](docs/supply-chain-security.md) for the threat model and secure-deployment checklist.
+
+### TODO
+- [ ] Adding a catalogue for [LoT Tunnels](https://lottunnels.github.io/)
+- [ ] Adding the capability of blocking Chrome extensions and adding a catalogue for a list like [chrome-mal-ids](https://github.com/The-Privacy-Commons-Institute/chrome-mal-ids)
+- [ ] Add automation examples, like implementing this into an Azure Automation runbook
+
+### Known issues
+- The script does not take any leftover capacity into account, for when blocking for other reasons is needed (i.e. targeted phishing)
