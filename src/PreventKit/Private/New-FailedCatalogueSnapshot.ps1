@@ -35,6 +35,11 @@ function New-FailedCatalogueSnapshot {
         $targetSettings = $Declaration.Targets
     }
 
+    $normalizationSettings = @{}
+    if ($Declaration.ContainsKey('Normalization')) {
+        $normalizationSettings = $Declaration.Normalization
+    }
+
     [pscustomobject]@{
         CatalogueName      = $Declaration.Name
         Scope              = $Declaration.Scope
@@ -67,5 +72,6 @@ function New-FailedCatalogueSnapshot {
             )
         }
         TargetSettings      = $targetSettings
+        NormalizationSettings = $normalizationSettings
     }
 }

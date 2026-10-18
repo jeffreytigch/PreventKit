@@ -65,8 +65,20 @@ function Get-RunCatalogueSnapshot {
         $PSCmdlet.ThrowTerminatingError($errorRecord)
     }
 
+    # Optional normalization settings. Patterns that require deriving a broader
+    # wildcard parent are recovered only when the declaration opts in.
+    $recoverDerivedWildcards = $false
+    if ($Declaration.ContainsKey('Normalization')) {
+        $normalization = $Declaration['Normalization']
+        if ($null -ne $normalization -and $normalization -is [System.Collections.IDictionary] -and
+            $normalization.Contains('RecoverDerivedWildcards')) {
+            $recoverDerivedWildcards = [bool]$normalization['RecoverDerivedWildcards']
+        }
+    }
+
     # Invoke the adapter's parse script
-    $parsed = & $adapter.ParseScript -Content $sourceData.Content -Scope $scope
+    $parsed = & $adapter.ParseScript -Content $sourceData.Content -Scope $scope `
+        -RecoverDerivedWildcards:$recoverDerivedWildcards
 
     $validation = Test-CatalogueValidation -Content $sourceData.Content -Parsed $parsed
     $snapshot = New-CatalogueSnapshot -Scope $scope -Source $source -Declaration $Declaration `

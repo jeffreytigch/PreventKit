@@ -5,11 +5,15 @@ canonical Service and Blockable Address model.
 
 .DESCRIPTION
 The LOTTunnels domains catalogue is a CSV with domain and name columns. Each
-row maps one blockable address to a named tunnelling service. Addresses that
-cannot be represented as a URL, domain, or IP address are checked against the
-catalogue's representable wildcard entries; covered addresses are recorded
-without a warning, while genuinely unrepresentable addresses are logged and
-skipped.
+row maps one blockable address to a named tunnelling service. Raw values are
+first passed through Get-NormalizedBlockableAddress, which recovers a
+representable address from common publishing patterns; when the caller opts in
+with RecoverDerivedWildcards it also recovers patterns that require deriving a
+broader wildcard parent. Addresses that remain unrepresentable are checked
+against the catalogue's representable wildcard entries; covered addresses are
+recorded without a warning, while genuinely unrepresentable addresses are
+logged and skipped. Every representable address records the raw source value
+whenever a recovery changed it.
 
 .OUTPUTS
 System.Management.Automation.PSCustomObject with Services, BlockableAddresses,
@@ -23,7 +27,10 @@ function ConvertFrom-LotTunnelsCsv {
 
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-        [string]$Scope
+        [string]$Scope,
+
+        [Parameter()]
+        [switch]$RecoverDerivedWildcards
     )
 
     $services = @{}
@@ -32,14 +39,22 @@ function ConvertFrom-LotTunnelsCsv {
 
     $rows = @($Content | ConvertFrom-Csv -ErrorAction Stop)
     foreach ($row in $rows) {
-        $domain = ([string]$row.domain).Trim()
+        $sourceValue = ([string]$row.domain).Trim()
         $serviceName = ([string]$row.name).Trim()
 
+        $domain = Get-NormalizedBlockableAddress -Value $sourceValue -RecoverDerivedWildcards:$RecoverDerivedWildcards
         $type = Get-BlockableAddressType -Value $domain
         if (-not $type) {
+            $reason = 'Not a representable URL, domain, or IP address'
+            if (-not $RecoverDerivedWildcards) {
+                $derived = Get-NormalizedBlockableAddress -Value $sourceValue -RecoverDerivedWildcards
+                if (Get-BlockableAddressType -Value $derived) {
+                    $reason = "Recoverable as '$derived' with Normalization.RecoverDerivedWildcards"
+                }
+            }
             $unrepresentable += [pscustomobject]@{
-                Value  = $domain
-                Reason = "Not a representable URL, domain, or IP address"
+                Value  = $sourceValue
+                Reason = $reason
             }
             continue
         }
@@ -53,11 +68,15 @@ function ConvertFrom-LotTunnelsCsv {
             }
         }
 
-        $blockableAddresses += [pscustomobject]@{
+        $address = [ordered]@{
             Value     = $domain
             Type      = $type
             ServiceId = $serviceId
         }
+        if ($domain -ne $sourceValue) {
+            $address['NormalizedFrom'] = $sourceValue
+        }
+        $blockableAddresses += [pscustomobject]$address
     }
 
     $covered = @(Get-CoveredBlockableAddress -RepresentableAddresses $blockableAddresses -Candidates $unrepresentable)

@@ -37,6 +37,26 @@ An optional `Targets` block carries per-target settings for a catalogue. The onl
 }
 ```
 
+An optional `Normalization` block controls how a source's raw address values are
+recovered before they are checked against the blockable address model. A source
+can publish blocking patterns that are not directly representable, such as a
+trailing port (`host.example.com:*`) or a wildcard inside a label
+(`agents*-cloud.acronis.com`). Recoveries that keep the source's meaning are
+always applied; a recovery that widens the block to a broader wildcard parent
+must be opted in:
+
+```powershell
+Normalization = @{
+    RecoverDerivedWildcards = $true
+}
+```
+
+`RecoverDerivedWildcards` recovers an address whose wildcard sits inside a label
+as a wildcard subdomain of the labels that follow it
+(`agents*-cloud.acronis.com` becomes `*.acronis.com`). It is off by default
+because it blocks a parent domain the source did not name. Recovered addresses
+retain their source value and are reported as `[recovered from: <value>]`.
+
 Built-in adapters:
 
 | Adapter | Source format |
@@ -45,9 +65,16 @@ Built-in adapters:
 | `LotTunnelsCsv` | [LOTTunnels](https://lottunnels.github.io) domains CSV (`domain`, `name` columns) |
 
 The repository includes enabled catalogue declarations for both built-in
-sources. The LOTTunnels source includes entries using wildcard patterns that
-PreventKit cannot safely represent; these are reported as unrepresentable and
-skipped, while representable domains are processed normally.
+sources. Both approve CNI broadening and derived-wildcard recovery, because each
+source wildcards whole tool domains and a wildcard is the only form CNI accepts.
+The LOTTunnels source includes entries using wildcard patterns that are not
+directly representable: recoverable patterns are normalized, and any entry that
+still cannot be represented is reported as unrepresentable and skipped.
+
+One recovered entry is withheld. Derived wildcard recovery would turn the LolRMM
+row `pdqinstallers.*.r2.cloudflarestorage.com` into `*.r2.cloudflarestorage.com`,
+blocking every Cloudflare R2 bucket instead of the single bucket the source
+names. `exceptions/shared-hosting.exception.psd1` suppresses that key.
 
 ## Snapshots and failures
 
