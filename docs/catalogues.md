@@ -65,9 +65,16 @@ Built-in adapters:
 | `LotTunnelsCsv` | [LOTTunnels](https://lottunnels.github.io) domains CSV (`domain`, `name` columns) |
 
 The repository includes enabled catalogue declarations for both built-in
-sources. The LOTTunnels source includes entries using wildcard patterns that are
-not directly representable: recoverable patterns are normalized, and any entry
-that still cannot be represented is reported as unrepresentable and skipped.
+sources. Both approve CNI broadening and derived-wildcard recovery, because each
+source wildcards whole tool domains and a wildcard is the only form CNI accepts.
+The LOTTunnels source includes entries using wildcard patterns that are not
+directly representable: recoverable patterns are normalized, and any entry that
+still cannot be represented is reported as unrepresentable and skipped.
+
+One recovered entry is withheld. Derived wildcard recovery would turn the LolRMM
+row `pdqinstallers.*.r2.cloudflarestorage.com` into `*.r2.cloudflarestorage.com`,
+blocking every Cloudflare R2 bucket instead of the single bucket the source
+names. `exceptions/shared-hosting.exception.psd1` suppresses that key.
 
 ## Snapshots and failures
 
