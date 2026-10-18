@@ -176,6 +176,51 @@ upload_data.qq.com,QQ
     }
 }
 
+Describe 'PreventKit LOTTunnels source adapter' {
+
+    It 'maps domain and name columns into services and blockable addresses' {
+        InModuleScope PreventKit {
+            $content = @'
+domain,name
+"*.example.net","Tunnel"
+"relay.example.net","Tunnel"
+"api.example.org","Another Tunnel"
+'@
+
+            $parsed = ConvertFrom-LotTunnelsCsv -Content $content -Scope 'lottunnels'
+
+            @($parsed.Services).Count | Should -Be 2
+            @($parsed.BlockableAddresses).Count | Should -Be 3
+
+            $wildcard = $parsed.BlockableAddresses | Where-Object { $_.Value -eq '*.example.net' }
+            $wildcard.Type | Should -Be 'Domain'
+            $wildcard.ServiceId | Should -Be 'lottunnels/Tunnel'
+
+            $otherService = $parsed.Services | Where-Object { $_.Name -eq 'Another Tunnel' }
+            $otherService.Id | Should -Be 'lottunnels/Another Tunnel'
+        }
+    }
+
+    It 'registers the built-in adapter and reports unrepresentable source patterns' {
+        InModuleScope PreventKit {
+            $adapter = Get-CatalogueAdapter -Name 'LotTunnelsCsv'
+            $adapter | Should -Not -BeNullOrEmpty
+
+            $content = @'
+domain,name
+"*.example.net","Tunnel"
+"relay-[a-f0-9]{8}.example.net:443","Tunnel"
+"*pitunnel.com","PiTunnel"
+'@
+
+            $parsed = & $adapter.ParseScript -Content $content -Scope 'lottunnels'
+
+            @($parsed.Covered | Where-Object { $_.Value -eq 'relay-[a-f0-9]{8}.example.net:443' }).Count | Should -Be 1
+            @($parsed.Unrepresentable | Where-Object { $_.Value -eq '*pitunnel.com' }).Count | Should -Be 1
+        }
+    }
+}
+
 Describe 'PreventKit covering is scoped to a catalogue source' {
 
     It 'does not treat an address covered by an entry from another catalogue as covered' {

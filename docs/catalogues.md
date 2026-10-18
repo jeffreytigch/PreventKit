@@ -42,6 +42,12 @@ Built-in adapters:
 | Adapter | Source format |
 | --- | --- |
 | `LolRmmCsv` | [lolrmm.io](https://lolrmm.io) RMM domains CSV (`URI`, `RMM_Tool` columns) |
+| `LotTunnelsCsv` | [LOTTunnels](https://lottunnels.github.io) domains CSV (`domain`, `name` columns) |
+
+The repository includes enabled catalogue declarations for both built-in
+sources. The LOTTunnels source includes entries using wildcard patterns that
+PreventKit cannot safely represent; these are reported as unrepresentable and
+skipped, while representable domains are processed normally.
 
 ## Snapshots and failures
 

@@ -126,3 +126,9 @@ Register-CatalogueAdapter -Name 'LolRmmCsv' -ParseScriptBlock {
     param($Content, $Scope)
     return ConvertFrom-LolRmmCsv -Content $Content -Scope $Scope
 } -Description 'Built-in LolRMM CSV parser'
+
+# Register built-in LOTTunnels domains CSV adapter
+Register-CatalogueAdapter -Name 'LotTunnelsCsv' -ParseScriptBlock {
+    param($Content, $Scope)
+    return ConvertFrom-LotTunnelsCsv -Content $Content -Scope $Scope
+} -Description 'Built-in LOTTunnels domains CSV parser'
