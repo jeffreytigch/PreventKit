@@ -8,6 +8,7 @@ BeforeAll {
     $emptyDir    = Join-Path $fixtureRoot 'empty'
     $disabledDir = Join-Path $fixtureRoot 'disabled'
     $multiDir    = Join-Path $fixtureRoot 'multi'
+    $broadeningDir = Join-Path $fixtureRoot 'broadening'
 }
 
 Describe 'PreventKit target seams' {
@@ -66,6 +67,9 @@ Describe 'PreventKit catalogue retrieval and validation' {
         $unrepresentableValues | Should -Not -Contain 'relay-[a-f0-9]{8}.net.anydesk.com:443'
         $unrepresentableValues | Should -Contain 'upload_data.qq.com'
         $unrepresentableValues | Should -Contain 'agents*-cloud.acronis.com'
+
+        $derivable = $snapshot.Unrepresentable | Where-Object { $_.Value -eq 'agents*-cloud.acronis.com' }
+        $derivable.Reason | Should -Be "Recoverable as '*.acronis.com' with Normalization.RecoverDerivedWildcards"
 
         $snapshot.Validation.Status | Should -Be 'Success'
     }
@@ -204,6 +208,24 @@ Describe 'PreventKit desired state and WhatIf report' {
         $text | Should -Match 'Unrepresentable \(2\):'
         $text | Should -Match ([regex]::Escape('upload_data.qq.com'))
         $text | Should -Match ([regex]::Escape('agents*-cloud.acronis.com'))
+    }
+
+    It 'recovers derived wildcards only when the declaration opts in' {
+        $snapshot = @(Invoke-PreventKitRun -CatalogueDirectory $broadeningDir)[0]
+
+        $snapshot.NormalizationSettings.RecoverDerivedWildcards | Should -BeTrue
+        $snapshot.Fingerprint.ParsedCounts.Unrepresentable | Should -Be 1
+
+        $recovered = $snapshot.BlockableAddresses | Where-Object { $_.Value -eq '*.acronis.com' }
+        $recovered.NormalizedFrom | Should -Be 'agents*-cloud.acronis.com'
+    }
+
+    It 'a WhatIf report shows the enabled normalization alongside recovered addresses' {
+        $report = @(Invoke-PreventKitRun -CatalogueDirectory $broadeningDir -WhatIf)
+        $text = $report -join "`n"
+
+        $text | Should -Match 'Normalization: RecoverDerivedWildcards'
+        $text | Should -Match ([regex]::Escape('*.acronis.com (Domain)  [recovered from: agents*-cloud.acronis.com]'))
     }
 
     It 'covered addresses never enter the desired state, CNI mappings, or TABL entries' {

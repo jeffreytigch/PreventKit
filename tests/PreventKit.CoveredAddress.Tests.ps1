@@ -158,6 +158,25 @@ agents*-cloud.acronis.com,Acronis
         }
     }
 
+    It 'derives a wildcard parent only when RecoverDerivedWildcards is supplied' {
+        InModuleScope PreventKit {
+            $content = @'
+URI,RMM_Tool
+*.anydesk.com,AnyDesk
+agents*-cloud.acronis.com,Acronis
+'@
+
+            $default = ConvertFrom-LolRmmCsv -Content $content -Scope 'lolrmm'
+            @($default.Unrepresentable).Count | Should -Be 1
+            @($default.BlockableAddresses | Where-Object { $_.Value -eq '*.acronis.com' }).Count | Should -Be 0
+
+            $derived = ConvertFrom-LolRmmCsv -Content $content -Scope 'lolrmm' -RecoverDerivedWildcards
+            @($derived.Unrepresentable).Count | Should -Be 0
+            $recovered = $derived.BlockableAddresses | Where-Object { $_.Value -eq '*.acronis.com' }
+            $recovered.NormalizedFrom | Should -Be 'agents*-cloud.acronis.com'
+        }
+    }
+
     It 'does not warn for a covered address, only for genuinely unrepresentable ones' {
         InModuleScope PreventKit {
             $content = @'
@@ -201,7 +220,7 @@ domain,name
         }
     }
 
-    It 'registers the built-in adapter and reports unrepresentable source patterns' {
+    It 'registers the built-in adapter and recovers a leading-wildcard pattern' {
         InModuleScope PreventKit {
             $adapter = Get-CatalogueAdapter -Name 'LotTunnelsCsv'
             $adapter | Should -Not -BeNullOrEmpty
@@ -216,7 +235,8 @@ domain,name
             $parsed = & $adapter.ParseScript -Content $content -Scope 'lottunnels'
 
             @($parsed.Covered | Where-Object { $_.Value -eq 'relay-[a-f0-9]{8}.example.net:443' }).Count | Should -Be 1
-            @($parsed.Unrepresentable | Where-Object { $_.Value -eq '*pitunnel.com' }).Count | Should -Be 1
+            @($parsed.BlockableAddresses | Where-Object { $_.Value -eq '*.pitunnel.com' }).Count | Should -Be 1
+            @($parsed.Unrepresentable).Count | Should -Be 0
         }
     }
 }

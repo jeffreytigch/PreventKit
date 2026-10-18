@@ -62,6 +62,11 @@ function New-CatalogueSnapshot {
         $targetSettings = $Declaration.Targets
     }
 
+    $normalizationSettings = @{}
+    if ($Declaration.ContainsKey('Normalization')) {
+        $normalizationSettings = $Declaration.Normalization
+    }
+
     [pscustomobject]@{
         CatalogueName       = $Declaration.Name
         Scope               = $Scope
@@ -73,5 +78,6 @@ function New-CatalogueSnapshot {
         Covered             = @($Parsed.Covered)
         Validation          = $Validation
         TargetSettings      = $targetSettings
+        NormalizationSettings = $normalizationSettings
     }
 }

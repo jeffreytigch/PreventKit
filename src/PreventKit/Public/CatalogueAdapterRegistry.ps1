@@ -14,6 +14,9 @@ Unique name for the adapter (e.g., 'MyCustomCsv').
 Scriptblock that parses the raw source content. Must accept parameters:
 -Content (string) - The raw source content
 -Scope (string) - The catalogue scope
+-RecoverDerivedWildcards (switch, optional) - Present when the catalogue
+declaration sets Normalization.RecoverDerivedWildcards; an adapter recovers
+scope-widening patterns only when it is supplied.
 Returns an object with Services and BlockableAddresses properties.
 
 .PARAMETER Description
@@ -123,12 +126,12 @@ $script:catalogueAdapters = @{}
 
 # Register built-in LolRmmCsv adapter
 Register-CatalogueAdapter -Name 'LolRmmCsv' -ParseScriptBlock {
-    param($Content, $Scope)
-    return ConvertFrom-LolRmmCsv -Content $Content -Scope $Scope
+    param($Content, $Scope, [switch]$RecoverDerivedWildcards)
+    return ConvertFrom-LolRmmCsv -Content $Content -Scope $Scope -RecoverDerivedWildcards:$RecoverDerivedWildcards
 } -Description 'Built-in LolRMM CSV parser'
 
 # Register built-in LOTTunnels domains CSV adapter
 Register-CatalogueAdapter -Name 'LotTunnelsCsv' -ParseScriptBlock {
-    param($Content, $Scope)
-    return ConvertFrom-LotTunnelsCsv -Content $Content -Scope $Scope
+    param($Content, $Scope, [switch]$RecoverDerivedWildcards)
+    return ConvertFrom-LotTunnelsCsv -Content $Content -Scope $Scope -RecoverDerivedWildcards:$RecoverDerivedWildcards
 } -Description 'Built-in LOTTunnels domains CSV parser'

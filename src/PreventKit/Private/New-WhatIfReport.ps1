@@ -77,10 +77,24 @@ function New-WhatIfReport {
         if ($contribution.Fingerprint.UsedLastKnownGood) {
             $lines += "  Last known good fallback: $($contribution.Fingerprint.FailureReason)"
         }
+        $normalizationProperty = $contribution.PSObject.Properties['NormalizationSettings']
+        if ($null -ne $normalizationProperty -and $null -ne $normalizationProperty.Value) {
+            $normalizationSettings = $normalizationProperty.Value
+            $recoverDerived = ($normalizationSettings -is [System.Collections.IDictionary]) -and
+                $normalizationSettings.Contains('RecoverDerivedWildcards') -and
+                [bool]$normalizationSettings['RecoverDerivedWildcards']
+            if ($recoverDerived) {
+                $lines += '  Normalization: RecoverDerivedWildcards'
+            }
+        }
         $lines += Format-ReportList -Title 'Services' -Items $cServices -Indent 2 `
             -Format { param($service) "  - $($service.Id) ($($service.Name))" }
         $lines += Format-ReportList -Title 'Blockable addresses' -Items $cAddresses -Indent 2 `
-            -Format { param($address) "  - $($address.Value) ($($address.Type))" }
+            -Format {
+                param($address)
+                $recovered = if ($address.PSObject.Properties['NormalizedFrom']) { "  [recovered from: $($address.NormalizedFrom)]" } else { '' }
+                "  - $($address.Value) ($($address.Type))$recovered"
+            }
 
         $cUnrepresentable = @()
         $unrepresentableProperty = $contribution.PSObject.Properties['Unrepresentable']
